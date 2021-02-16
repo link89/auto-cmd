@@ -14,7 +14,7 @@ install_requirements = [
     'fire',
     'falcon',
     'pyparsing',
-    'setuptools_rust',
+    'pynput',
 ]
 
 if sys.platform == 'darwin':
