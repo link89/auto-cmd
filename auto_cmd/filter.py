@@ -64,7 +64,7 @@ def eval_ldap_filter(ast: pp.ParseResults, obj, get_value=default_object_get_val
     raise ValueError('Invalid Syntax!')
 
 
-def create_ldap_filter(expr, get_value=default_object_get_value):
+def create_ldap_filter_fn(expr, get_value=default_object_get_value):
     parsed_filter = parse_ldap_filter(expr)
     return lambda obj: eval_ldap_filter(parsed_filter, obj, get_value)
 
@@ -104,7 +104,7 @@ class TestFilter(unittest.TestCase):
             '(&(title~="Chrome*")(role!="menu"))',
         ]
         for expr in exprs:
-            filter_fn = create_ldap_filter(expr, default_dict_get_value)
+            filter_fn = create_ldap_filter_fn(expr, default_dict_get_value)
             self.assertTrue(filter_fn(obj))
 
         exprs = [
@@ -112,7 +112,7 @@ class TestFilter(unittest.TestCase):
             '(!(title~="Chrome*"))',
         ]
         for expr in exprs:
-            filter_fn = create_ldap_filter(expr, default_dict_get_value)
+            filter_fn = create_ldap_filter_fn(expr, default_dict_get_value)
             self.assertFalse(filter_fn(obj))
 
 
