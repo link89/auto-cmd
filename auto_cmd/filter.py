@@ -5,11 +5,13 @@ ppc = pp.pyparsing_common
 
 
 # LDAP style filter (RFC4515)
+BOOLEAN = pp.oneOf('true True yes false False no').setParseAction(
+    pp.tokenMap(lambda token: token in ('true', 'True', 'yes')))
 
 EQ, ASTERISK = map(pp.Literal, "=*")
 LPAREN, RPAREN, COLON = map(pp.Suppress, "():")
 
-ASSERTION_VALUE = pp.quotedString | ppc.number
+ASSERTION_VALUE = pp.quotedString | ppc.number | BOOLEAN
 ATTR = ppc.identifier | ASTERISK
 MATCHING_RULE = COLON + ppc.identifier
 FILTER_TYPE = pp.MatchFirst(map(pp.Literal, ('>', '>=', '<', '<=', '!=', '=', '~=')))
@@ -72,6 +74,8 @@ def create_ldap_filter_fn(expr, get_value=default_object_get_value):
 def _eval_simple(ast, obj, get_value):
     attr, op, assertion_value = ast
     value = get_value(obj, attr)
+    if value is None:
+        return False
     assertion_value = _unescape_assertion_value(assertion_value)
     return {
         '>': lambda a, b: a > b,
@@ -96,9 +100,12 @@ class TestFilter(unittest.TestCase):
         obj = {
             'title': 'Chrome Browser',
             'role': 'window',
+            'hidden': True,
         }
         exprs = [
             '(title="Chrome Browser")',
+            '(hidden=true)',
+            '(hidden=yes)',
             '(title~="Chrome*")',
             '(&(title~="Chrome*")(role="window"))',
             '(&(title~="Chrome*")(role!="menu"))',
@@ -109,6 +116,9 @@ class TestFilter(unittest.TestCase):
 
         exprs = [
             '(title="Chrome")',
+            '(hidden=false)',
+            '(hidden=false)',
+            '(hidden=no)',
             '(!(title~="Chrome*"))',
         ]
         for expr in exprs:
