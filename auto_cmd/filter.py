@@ -117,7 +117,6 @@ class TestFilter(unittest.TestCase):
         exprs = [
             '(title="Chrome")',
             '(hidden=false)',
-            '(hidden=false)',
             '(hidden=no)',
             '(!(title~="Chrome*"))',
         ]
