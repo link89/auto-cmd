@@ -33,7 +33,9 @@ setup(
     long_description=description,
     install_requires=install_requirements,
     entry_points={
-        'console_scripts': ['autocmd=auto_cmd.main:cli'],
+        'console_scripts': [
+            'auto_cmd=auto_cmd.main:cli',
+        ],
     },
     python_requires=">=3.6",
     classifiers=[
