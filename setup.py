@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 
-import ast
-import re
-import subprocess
 import sys
 
 from setuptools import find_packages, setup
@@ -12,9 +9,10 @@ description = 'Cross-platform CLI tools and HTTP RPC server for desktop automati
 
 install_requirements = [
     'fire',
-    'falcon',
+    'fastapi',
     'pyparsing',
     'pynput',
+    'uvicorn',
 ]
 
 if sys.platform == 'darwin':
@@ -27,14 +25,14 @@ setup(
     author='link89',
     author_email='xuweihong.cn@gmail.com',
     version='0.0.1',
-    url='http://mycli.net',
     packages=find_packages(),
     description=description,
     long_description=description,
     install_requires=install_requirements,
     entry_points={
         'console_scripts': [
-            'auto_cmd=auto_cmd.main:cli',
+            'auto_cmd=auto_cmd.cli:main',
+            'auto_cmd_http=auto_cmd.http:main',
         ],
     },
     python_requires=">=3.6",
