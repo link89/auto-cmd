@@ -4,4 +4,3 @@ import fire
 
 def main():
     fire.Fire(AutoCmd)
-

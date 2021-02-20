@@ -45,18 +45,23 @@ class ElementWrapper:
         filters = []
         node = self
         while node:
-            if node.search_string:
-                filters.insert(0, node.search_string)
+            s = node.search_string
+            if s:
+                if node._parent:
+                    s += ' --chain'
+                filters.insert(0, s)
             node = node._parent
         return ' - '.join(filters)
 
     @property
     def role(self):
-        return self._element.AXRole if 'AXRole' in self.attributes else None
+        if 'AXRole' in self.attributes:
+            return self._element.AXRole
 
     @property
     def title(self):
-        return self._element.AXTitle if 'AXTitle' in self.attributes else None
+        if 'AXTitle' in self.attributes:
+            return self._element.AXTitle
 
     @property
     def attributes(self):
@@ -100,7 +105,7 @@ class MacCmd(BaseCmd):
 
         def action(stack: tuple) -> tuple:
             result: List[ElementWrapper] = []
-            fifo: List[Tuple[int, ElementWrapper]] = []
+            fifo: List[Tuple[int, ElementWrapper]] = []  # (depth, node)
             if chain and stack:
                 if isinstance(stack[-1], ElementWrapper):
                     fifo.append((0, stack[-1]))
@@ -120,12 +125,12 @@ class MacCmd(BaseCmd):
                     result.append(el)
                     if limit and (len(result) >= limit):
                         break
-            return *stack[:-1], result
+            return *stack, result
 
         self._enqueue_action(action)
         return self
 
-    def find(self, filter, max_depth=0, chain=True):
+    def find(self, filter=None, max_depth=0, chain=True):
         self.find_many(filter, max_depth, limit=1, chain=chain)
         self.nth(0)
         return self
@@ -133,7 +138,7 @@ class MacCmd(BaseCmd):
     def nth(self, n: int):
         def action(stack: tuple) -> tuple:
             # TODO: friendly error handling
-            return *stack[:-1], stack[-1][n]
+            return *stack, stack[-1][n]
         self._enqueue_action(action)
         return self
 
