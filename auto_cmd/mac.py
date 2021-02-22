@@ -1,9 +1,12 @@
 import atomac
 from atomac import NativeUIElement
 from typing import Iterable, List, Tuple, Callable
+from pynput.mouse import Controller, Button
 
 from .common import BaseCmd
 from .filter import create_ldap_filter_fn
+
+_mouse = Controller()
 
 
 class ElementWrapper:
@@ -20,9 +23,9 @@ class ElementWrapper:
 
     @property
     def children(self):
-        children = []
+        children = ()
         try:
-            children = self._element.AXChildren or []
+            children = self._element.AXChildren or ()
         except:
             pass
         return self.create_many(children, self)
@@ -37,7 +40,7 @@ class ElementWrapper:
     def search_string(self):
         if not (self.title and self.role):
             return None
-        return "find '(&(role={})(title={}))'".format(
+        return "'(&(role={})(title={}))'".format(
             format_assertion_value(self.role), format_assertion_value(self.title))
 
     @property
@@ -45,11 +48,9 @@ class ElementWrapper:
         filters = []
         node = self
         while node:
-            s = node.search_string
-            if s:
-                if node._parent:
-                    s += ' --chain'
-                filters.insert(0, s)
+            if node.search_string:
+                prefix = 'select ' if node._parent is None else 'find '
+                filters.insert(0, prefix + node.search_string)
             node = node._parent
         return ' - '.join(filters)
 
@@ -94,56 +95,59 @@ class ElementWrapper:
         return str(self)
 
 
+def ensure_not_empty(stack: tuple):
+    if not stack:
+        raise ValueError("stack should not be empty!")
+
+
+def ensure_element_wrappers(x) -> Tuple[ElementWrapper]:
+    if not x:
+        raise ValueError("Data is empty!")
+    if isinstance(x, tuple) and isinstance(x[0], ElementWrapper):
+        return x
+    raise ValueError("expect `Tuple[ElementWrapper]`, actual: {}: {}".format(type(x), str(x)))
+
+
 class MacCmd(BaseCmd):
 
     def __init__(self, blob_type='base64', output_type='json'):
         super().__init__(blob_type, output_type)
         self._filter_fn_factory = lambda expr: create_ldap_filter_fn(expr, element_get_value)
 
-    def find_many(self, filter=None, max_depth=0, limit=0, chain=True):
+    def select(self, filter=None, max_depth=0, limit=0):
         filter_fn = (lambda _: True) if filter is None else self._filter_fn_factory(filter)
+        return self._search(filter_fn, max_depth, limit, chain=False)
 
-        def action(stack: tuple) -> tuple:
-            result: List[ElementWrapper] = []
-            fifo: List[Tuple[int, ElementWrapper]] = []  # (depth, node)
-            if chain and stack:
-                if isinstance(stack[-1], ElementWrapper):
-                    fifo.append((0, stack[-1]))
-                elif isinstance(stack[-1], tuple) and isinstance(stack[-1][0], ElementWrapper):
-                    fifo.extend(map(lambda el: (0, el), stack[-1]))
-                else:
-                    raise ValueError("Top of result stack must be `ElementWrapper` or tuple of `ElementWrapper` when "
-                                     "`chain` option is true")
-            else:
-                fifo.extend(map(lambda el: (0, el), get_running_apps()))
-            # order travelling
-            while fifo:
-                depth, el = fifo.pop(0)
-                if (not max_depth) or (depth + 1 < depth):
-                    fifo.extend(map(lambda child: (depth + 1, child), el.children))
-                if el.is_match(filter_fn):
-                    result.append(el)
-                    if limit and (len(result) >= limit):
-                        break
-            return *stack, result
-
-        self._enqueue_action(action)
-        return self
-
-    def find(self, filter=None, max_depth=0, chain=True):
-        self.find_many(filter, max_depth, limit=1, chain=chain)
-        self.nth(0)
-        return self
+    def find(self, filter=None, max_depth=0, limit=0):
+        filter_fn = (lambda _: True) if filter is None else self._filter_fn_factory(filter)
+        return self._search(filter_fn, max_depth, limit, chain=True)
 
     def nth(self, n: int):
         def action(stack: tuple) -> tuple:
-            # TODO: friendly error handling
-            return *stack, stack[-1][n]
+            el = ensure_element_wrappers(stack[-1])[n]
+            return *stack[:-1], (el,)
+
         self._enqueue_action(action)
         return self
 
     def click(self):
-        ...
+        def action(stack):
+            ensure_not_empty(stack)
+            el = ensure_element_wrappers(stack[-1])[0]
+            _mouse.position = el.center
+            _mouse.click(Button.left)
+            return stack
+        self._enqueue_action(action)
+        return self
+
+    def activate(self):
+        def action(stack):
+            ensure_not_empty(stack)
+            el = ensure_element_wrappers(stack[-1])[0]
+            el.activate()
+            return stack
+        self._enqueue_action(action)
+        return self
 
     def find_app(self, name=None, pid=0, bundle_id=None):
         def action(stack):
@@ -156,6 +160,29 @@ class MacCmd(BaseCmd):
             else:
                 app = atomac.getFrontmostApp()
             return *stack, ElementWrapper(app)
+        self._enqueue_action(action)
+        return self
+
+    def _search(self, filter_fn=lambda _: True, max_depth=0, limit=0, chain=True):
+        def action(stack: tuple) -> tuple:
+            result: List[ElementWrapper] = []
+            fifo: List[Tuple[int, ElementWrapper]] = []  # (depth, node)
+            if chain:  # search based on previous result
+                ensure_not_empty(stack)
+                els = ensure_element_wrappers(stack[-1])
+                fifo.extend(map(lambda _el: (0, _el), els))
+            else:  # search from system root
+                fifo.extend(map(lambda _el: (0, _el), get_running_apps()))
+            # order travelling
+            while fifo:
+                depth, el = fifo.pop(0)
+                if (not max_depth) or (depth + 1 < depth):
+                    fifo.extend(map(lambda child: (depth + 1, child), el.children))
+                if el.is_match(filter_fn):
+                    result.append(el)
+                    if limit and (len(result) >= limit):
+                        break
+            return *stack[:-1], tuple(result)
         self._enqueue_action(action)
         return self
 

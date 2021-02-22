@@ -22,3 +22,4 @@ class BaseCmd:
 
     def __str__(self):
         return 'Call `execute` to run command and get result!'
+
