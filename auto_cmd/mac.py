@@ -9,12 +9,12 @@ from .filter import create_ldap_filter_fn
 _mouse = Controller()
 
 
-class ElementWrapper:
+class WrappedElement:
     @classmethod
-    def create_many(cls, els: Iterable[NativeUIElement], parent: 'ElementWrapper' = None):
+    def create_many(cls, els: Iterable[NativeUIElement], parent: 'WrappedElement' = None):
         return map(lambda el: cls(el, parent), els)
 
-    def __init__(self, element: NativeUIElement, parent: 'ElementWrapper' = None):
+    def __init__(self, element: NativeUIElement, parent: 'WrappedElement' = None):
         self._element = element
         self._parent = parent
 
@@ -71,7 +71,7 @@ class ElementWrapper:
         except:
             return []
 
-    def is_match(self, filter_fn: Callable[['ElementWrapper'], bool]) -> bool:
+    def is_match(self, filter_fn: Callable[['WrappedElement'], bool]) -> bool:
         return filter_fn(self)
 
     def __str__(self):
@@ -100,10 +100,10 @@ def ensure_not_empty(stack: tuple):
         raise ValueError("stack should not be empty!")
 
 
-def ensure_element_wrappers(x) -> Tuple[ElementWrapper]:
+def ensure_wrapped_elements(x) -> Tuple[WrappedElement]:
     if not x:
         raise ValueError("Data is empty!")
-    if isinstance(x, tuple) and isinstance(x[0], ElementWrapper):
+    if isinstance(x, tuple) and isinstance(x[0], WrappedElement):
         return x
     raise ValueError("expect `Tuple[ElementWrapper]`, actual: {}: {}".format(type(x), str(x)))
 
@@ -114,17 +114,17 @@ class MacCmd(BaseCmd):
         super().__init__(blob_type, output_type)
         self._filter_fn_factory = lambda expr: create_ldap_filter_fn(expr, element_get_value)
 
-    def select(self, filter=None, max_depth=0, limit=0):
+    def select(self, filter=None, max_depth=0, limit=1):
         filter_fn = (lambda _: True) if filter is None else self._filter_fn_factory(filter)
         return self._search(filter_fn, max_depth, limit, chain=False)
 
-    def find(self, filter=None, max_depth=0, limit=0):
+    def find(self, filter=None, max_depth=0, limit=1):
         filter_fn = (lambda _: True) if filter is None else self._filter_fn_factory(filter)
         return self._search(filter_fn, max_depth, limit, chain=True)
 
     def nth(self, n: int):
         def action(stack: tuple) -> tuple:
-            el = ensure_element_wrappers(stack[-1])[n]
+            el = ensure_wrapped_elements(stack[-1])[n]
             return *stack[:-1], (el,)
 
         self._enqueue_action(action)
@@ -133,7 +133,7 @@ class MacCmd(BaseCmd):
     def click(self):
         def action(stack):
             ensure_not_empty(stack)
-            el = ensure_element_wrappers(stack[-1])[0]
+            el = ensure_wrapped_elements(stack[-1])[0]
             _mouse.position = el.center
             _mouse.click(Button.left)
             return stack
@@ -143,13 +143,13 @@ class MacCmd(BaseCmd):
     def activate(self):
         def action(stack):
             ensure_not_empty(stack)
-            el = ensure_element_wrappers(stack[-1])[0]
+            el = ensure_wrapped_elements(stack[-1])[0]
             el.activate()
             return stack
         self._enqueue_action(action)
         return self
 
-    def find_app(self, name=None, pid=0, bundle_id=None):
+    def select_app(self, name=None, pid=0, bundle_id=None):
         def action(stack):
             if name:
                 app = atomac.getAppRefByLocalizedName(name)
@@ -159,17 +159,17 @@ class MacCmd(BaseCmd):
                 app = atomac.getAppRefByBundleId(bundle_id)
             else:
                 app = atomac.getFrontmostApp()
-            return *stack, ElementWrapper(app)
+            return *stack, (WrappedElement(app),)
         self._enqueue_action(action)
         return self
 
     def _search(self, filter_fn=lambda _: True, max_depth=0, limit=0, chain=True):
         def action(stack: tuple) -> tuple:
-            result: List[ElementWrapper] = []
-            fifo: List[Tuple[int, ElementWrapper]] = []  # (depth, node)
+            result: List[WrappedElement] = []
+            fifo: List[Tuple[int, WrappedElement]] = []  # (depth, node)
             if chain:  # search based on previous result
                 ensure_not_empty(stack)
-                els = ensure_element_wrappers(stack[-1])
+                els = ensure_wrapped_elements(stack[-1])
                 fifo.extend(map(lambda _el: (0, _el), els))
             else:  # search from system root
                 fifo.extend(map(lambda _el: (0, _el), get_running_apps()))
@@ -187,7 +187,7 @@ class MacCmd(BaseCmd):
         return self
 
 
-def element_get_value(obj: ElementWrapper, attr=None):
+def element_get_value(obj: WrappedElement, attr=None):
     if attr is None:
         return []
     if attr not in ['role', 'title']:
@@ -195,13 +195,13 @@ def element_get_value(obj: ElementWrapper, attr=None):
     return getattr(obj, attr)
 
 
-def get_running_apps() -> Iterable[ElementWrapper]:
+def get_running_apps() -> Iterable[WrappedElement]:
     apps = []
     for app in NativeUIElement._getRunningApps():
         if app.isFinishedLaunching():
             pid = app.processIdentifier()
             apps.append(atomac.getAppRefByPid(pid))
-    return ElementWrapper.create_many(apps)
+    return WrappedElement.create_many(apps)
 
 
 def format_assertion_value(s: str):

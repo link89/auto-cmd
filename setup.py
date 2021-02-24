@@ -31,8 +31,8 @@ setup(
     install_requires=install_requirements,
     entry_points={
         'console_scripts': [
-            'auto_cmd=auto_cmd.cli:main',
-            'auto_cmd_http=auto_cmd.http:main',
+            'auto-cmd=auto_cmd.cli:main',
+            'auto-cmd-http=auto_cmd.http:main',
         ],
     },
     python_requires=">=3.6",
