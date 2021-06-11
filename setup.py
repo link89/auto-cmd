@@ -10,7 +10,6 @@ description = 'Cross-platform CLI tools and HTTP RPC server for desktop automati
 install_requirements = [
     'fire',
     'fastapi',
-    'pyparsing',
     'pynput',
     'uvicorn',
 ]
