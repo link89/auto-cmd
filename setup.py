@@ -24,7 +24,7 @@ setup(
     name='auto-cmd',
     author='link89',
     author_email='xuweihong.cn@gmail.com',
-    version='0.0.1',
+    version='0.0.2',
     packages=find_packages(),
     description=description,
     long_description=description,
@@ -32,7 +32,7 @@ setup(
     entry_points={
         'console_scripts': [
             'auto-cmd=auto_cmd.cli:main',
-            'auto-cmd-http=auto_cmd.http:main',
+            'auto-cmd-http=auto_cmd.http_server:main',
         ],
     },
     python_requires=">=3.6",
