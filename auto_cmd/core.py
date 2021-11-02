@@ -2,7 +2,11 @@ from PIL import ImageGrab, Image
 from pprint import pprint
 
 
-class ImageResult:
+class Result:
+    pass
+
+
+class ImageResult(Result):
     def __init__(self, img: Image):
         self.img = img
 
@@ -48,8 +52,6 @@ class BaseVm:
             img = result.img.convert('L')
             return self._push(ImageResult(img))
 
-        raise Exception('unsupported input')
-
     def bi_level(self, range: tuple):
         result = self._pop()
         if type(range) is not tuple:
@@ -58,7 +60,6 @@ class BaseVm:
             lut = lambda x: 255 if range[0] <= x < range[1] else 0
             img = result.img.point(lut, mode='1')
             return self._push(ImageResult(img))
-        raise Exception('unsupported input')
 
     def resize(self, ratio: int):
         result = self._pop()
@@ -67,4 +68,3 @@ class BaseVm:
             print(ratio)
             img = result.img.resize((w * ratio, h * ratio), resample=Image.ANTIALIAS)
             return self._push(ImageResult(img))
-        raise Exception('unsupported input')
