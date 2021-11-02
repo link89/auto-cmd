@@ -1,30 +1,70 @@
-from typing import TypeVar, Generic, Tuple, Any, List
+from PIL import ImageGrab, Image
+from pprint import pprint
 
-T = TypeVar('T')
+
+class ImageResult:
+    def __init__(self, img: Image):
+        self.img = img
+
+    def debug(self):
+        pprint(self.img.info)
+        self.img.show()
+
+    def to_base64(self):
+        pass
+
+    def to_file_path(self):
+        pass
 
 
-class BaseVm(Generic[T]):
+class BaseVm:
+    def __init__(self):
+        self._stack = []
 
-    def __init__(self, blob_type='base64', output_type='json'):
-        self._blob_type = blob_type
-        self._output_type = output_type
+    def _push(self, result):
+        self._stack.append(result)
+        return self
 
-        self._stack: List[Tuple[T, Any]] = []
+    def _pop(self):
+        return self._stack.pop()
 
-    def _pop_stack(self) -> Tuple[T, Any]:
-        return self._stack.pop(0)
+    def to_base64(self):
+        result = self._pop()
+        if callable(getattr(result, 'to_base64')):
+            return result.to_base64()
 
-    def _peek_stack(self) -> Tuple[T, Any]:
-        return self._stack[0]
+    def debug(self):
+        result = self._pop()
+        if callable(getattr(result, 'debug')):
+            return result.debug()
 
-    def _push_stack(self, dtype: T, data: Any):
-        self._stack.append((dtype, data))
+    def take_screenshot(self, from_clipboard: bool = False):
+        img = ImageGrab.grabclipboard() if from_clipboard else ImageGrab.grab()
+        return self._push(ImageResult(img))
 
-    def _validate_dtype(self, expect: T, actual: T):
-        assert actual == expect, "Expect: {}, Actual {}".format(expect, actual)
+    def grayscale(self):
+        result = self._pop()
+        if isinstance(result, ImageResult):
+            img = result.img.convert('L')
+            return self._push(ImageResult(img))
 
-    def __str__(self):
-        return ''
+        raise Exception('unsupported input')
 
-    def __repr__(self):
-        return ''
+    def bi_level(self, range: tuple):
+        result = self._pop()
+        if type(range) is not tuple:
+            raise Exception('unsupported input')
+        if isinstance(result, ImageResult):
+            lut = lambda x: 255 if range[0] <= x < range[1] else 0
+            img = result.img.point(lut, mode='1')
+            return self._push(ImageResult(img))
+        raise Exception('unsupported input')
+
+    def resize(self, ratio: int):
+        result = self._pop()
+        if isinstance(result, ImageResult):
+            w, h = result.img.size
+            print(ratio)
+            img = result.img.resize((w * ratio, h * ratio), resample=Image.ANTIALIAS)
+            return self._push(ImageResult(img))
+        raise Exception('unsupported input')

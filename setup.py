@@ -12,6 +12,8 @@ install_requirements = [
     'fastapi',
     'pynput',
     'uvicorn',
+    'pytesseract',
+    'Pillow',
 ]
 
 if sys.platform == 'darwin':
