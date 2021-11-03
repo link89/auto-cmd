@@ -1,6 +1,7 @@
 from PIL import ImageGrab, Image
 from pprint import pprint
-
+import pytesseract
+from pytesseract import Output
 
 class Result:
     pass
@@ -17,8 +18,13 @@ class ImageResult(Result):
     def to_base64(self):
         pass
 
-    def to_file_path(self):
-        pass
+
+class TesseractOcrResult(Result):
+    def __init__(self, data):
+        self._data = data
+
+    def debug(self):
+        pprint(self._data)
 
 
 class BaseVm:
@@ -42,7 +48,7 @@ class BaseVm:
         if callable(getattr(result, 'debug')):
             return result.debug()
 
-    def take_screenshot(self, from_clipboard: bool = False):
+    def take_screenshot(self, from_clipboard=False):
         img = ImageGrab.grabclipboard() if from_clipboard else ImageGrab.grab()
         return self._push(ImageResult(img))
 
@@ -65,6 +71,18 @@ class BaseVm:
         result = self._pop()
         if isinstance(result, ImageResult):
             w, h = result.img.size
-            print(ratio)
             img = result.img.resize((w * ratio, h * ratio), resample=Image.ANTIALIAS)
             return self._push(ImageResult(img))
+
+    def ocr(self, psm: int = None, oem: int = None):
+        result = self._pop()
+
+        if isinstance(result, ImageResult):
+            options = []
+            if psm is not None:
+                options.append('--psm ' + str(psm))
+            if oem is not None:
+                options.append('--oem ' + str(oem))
+            config = ' '.join(options) if options else ''
+            data = pytesseract.image_to_data(result.img, config=config, output_type=Output.DICT)
+            return self._push(TesseractOcrResult(data))
