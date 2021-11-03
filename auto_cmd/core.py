@@ -20,11 +20,21 @@ class ImageResult(Result):
 
 
 class TesseractOcrResult(Result):
-    def __init__(self, data):
-        self._data = data
+    def __init__(self, results):
+        self._results = results
 
     def debug(self):
-        pprint(self._data)
+        for i in range(0, len(self._results["text"])):
+            x = self._results["left"][i]
+            y = self._results["top"][i]
+            w = self._results["width"][i]
+            h = self._results["height"][i]
+            text = self._results["text"][i]
+            conf = int(self._results["conf"][i])
+            print("{}".format(i) + "=" * 30)
+            print("text: {}".format(text))
+            print("location: x, y: {}, {}, w, h: {}, {}".format(x, y, w, h))
+            print("conf: {}".format(conf))
 
 
 class BaseVm:
