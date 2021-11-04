@@ -137,23 +137,27 @@ class BaseVm:
     def _peek(self):
         return self._stack[-1]
 
-    def to_base64(self):
-        result = self._pop()
-        if callable(getattr(result, 'to_base64')):
-            return self._push(result.to_base64())
-
     def debug(self, *args, **kwargs):
         result = self._peek()
-        if hasattr(result, 'debug') and callable(getattr(result, 'debug')):
+        if has_implement_protocol(result, 'debug'):
             result.debug(*args, **kwargs)
         else:
             pprint(result)
+
+    def sleep(self, sec: int):
+        time.sleep(sec)
+        return self
+
+    def to_base64(self):
+        result = self._pop()
+        if has_implement_protocol(result, 'to_base64'):
+            return self._push(result.to_base64())
 
     def click(self, button='left', count=1):
         result = self._peek()
         if isinstance(result, RectResult):
             mouse.position = result.center
-            mouse.click(get_pynpy_mouse_button(button), count)
+            mouse.click(get_pynput_mouse_button(button), count)
             return self
 
     def take_screenshot(self, from_clipboard=False):
@@ -199,8 +203,12 @@ class BaseVm:
             return self._push(loc)
 
 
-def get_pynpy_mouse_button(button: str):
+def get_pynput_mouse_button(button: str):
     return {
         'left': Button.left,
         'right': Button.right,
     }[button]
+
+
+def has_implement_protocol(obj, proto: str):
+    return hasattr(obj, proto) and callable(getattr(obj, proto))
