@@ -1,43 +1,123 @@
-from PIL import ImageGrab, Image
+from PIL import ImageGrab, Image, ImageDraw
 from pprint import pprint
 import pytesseract
 from pytesseract import Output
+import base64
+from io import BytesIO
+from collections import namedtuple
+from pynput.mouse import Button, Controller
+
+
+# Singletons
+mouse = Controller()
+
 
 class Result:
     pass
 
 
 class ImageResult(Result):
-    def __init__(self, img: Image):
+    def __init__(self, img: Image, scale=1):
         self.img = img
+        self.scale = 1
 
     def debug(self):
         pprint(self.img.info)
+        pprint(self.img.size)
         self.img.show()
 
     def to_base64(self):
-        pass
+        buffered = BytesIO()
+        self.img.save(buffered, format="JPEG")
+        return base64.b64encode(buffered.getvalue())
+
+
+TesseractItem = namedtuple('TesseractItem', [
+    'level', 'page_num', 'block_num', 'par_num', 'line_num', 'word_num',
+    'text',
+    'left', 'top', 'width', 'height', 'conf'])
+
+
+class RectResult(Result):
+
+    def __init__(self, x, y, w, h):
+        self._x = x
+        self._y = y
+        self._w = w
+        self._h = h
+
+    @property
+    def center(self):
+        return self._x + self._w / 2, self._y + self._h / 2
 
 
 class TesseractOcrResult(Result):
-    def __init__(self, results):
+
+    @staticmethod
+    def get_level(name: str):
+        return {
+            'page': 1,
+            'block': 2,
+            'paragraph': 3,
+            'par': 3,
+            'line': 4,
+            'word': 5,
+        }[name]
+
+    def __init__(self, img_result: ImageResult, results):
+        self._img_result = img_result
         self._results = results
 
-    def debug(self):
-        for i in range(0, len(self._results["text"])):
-            x = self._results["left"][i]
-            y = self._results["top"][i]
-            w = self._results["width"][i]
-            h = self._results["height"][i]
-            text = self._results["text"][i]
-            conf = int(self._results["conf"][i])
-            print("{}".format(i) + "=" * 30)
-            print("text: {}".format(text))
-            print("location: x, y: {}, {}, w, h: {}, {}".format(x, y, w, h))
-            print("conf: {}".format(conf))
+    def iter_results(self):
+        for i, _ in enumerate(self._results["text"]):
+            yield TesseractItem(
+                level=self._results["level"][i],
+                page_num=self._results["page_num"][i],
+                block_num=self._results["block_num"][i],
+                par_num=self._results["par_num"][i],
+                line_num=self._results["line_num"][i],
+                word_num=self._results["word_num"][i],
+                text=self._results["text"][i],
+                top=self._results["top"][i],
+                left=self._results["left"][i],
+                width=self._results["width"][i],
+                height=self._results["height"][i],
+                conf=self._results["conf"][i],
+            )
 
+    def debug(self, level='word'):
+        level_num = self.get_level(level)
+        img = self._img_result.img.convert("RGBA")
+        draw = ImageDraw.Draw(img)
+        for item in self.iter_results():
+            if level_num != item.level:
+                continue
+            draw.rectangle(((item.left, item.top), (item.left+item.width, item.top+item.height)), outline='green', width=4)
+            print("=" * 30)
+            print("text: {}".format(item.text))
+            print("location: x, y: {}, {}, w, h: {}, {}".format(item.left, item.top, item.width, item.height))
+            print("conf: {}".format(item.conf))
+        img.show()
+
+    def locate_by_text(self, text: str):
+        level_num = self.get_level('word')
+        for item in self.iter_results():
+            if level_num != item.level or item.conf < 0:
+                continue
+            if item.text == text:
+                w, h = self._img_result.img.size
+                scale = self._img_result.scale
+                return RectResult(item.left / scale, item.top / scale, item.width / scale, item.height / scale)
 
 class BaseVm:
+
+    @staticmethod
+    def get_mouse_button(button: str):
+        return {
+            'left': Button.left,
+            'right': Button.right,
+        }[button]
+
     def __init__(self):
         self._stack = []
 
@@ -48,15 +128,25 @@ class BaseVm:
     def _pop(self):
         return self._stack.pop()
 
+    def _peek(self):
+        return self._stack[-1]
+
     def to_base64(self):
         result = self._pop()
         if callable(getattr(result, 'to_base64')):
             return result.to_base64()
 
-    def debug(self):
+    def debug(self, *args, **kwargs):
         result = self._pop()
         if callable(getattr(result, 'debug')):
-            return result.debug()
+            return result.debug(*args, **kwargs)
+
+    def click(self, button='left', count=1):
+        result = self._peek()
+        if isinstance(result, RectResult):
+            mouse.move(*result.center)
+            mouse.click(self.get_mouse_button(button), count)
+            return self
 
     def take_screenshot(self, from_clipboard=False):
         img = ImageGrab.grabclipboard() if from_clipboard else ImageGrab.grab()
@@ -73,7 +163,7 @@ class BaseVm:
         if type(range) is not tuple:
             raise Exception('unsupported input')
         if isinstance(result, ImageResult):
-            lut = lambda x: 255 if range[0] <= x < range[1] else 0
+            lut = lambda x: 0 if range[0] <= x < range[1] else 255
             img = result.img.point(lut, mode='1')
             return self._push(ImageResult(img))
 
@@ -82,17 +172,20 @@ class BaseVm:
         if isinstance(result, ImageResult):
             w, h = result.img.size
             img = result.img.resize((w * ratio, h * ratio), resample=Image.ANTIALIAS)
-            return self._push(ImageResult(img))
+            return self._push(ImageResult(img, ratio))
 
-    def ocr(self, psm: int = None, oem: int = None):
+    def ocr(self, psm: int = 4, oem: int = 1):
         result = self._pop()
-
         if isinstance(result, ImageResult):
-            options = []
-            if psm is not None:
-                options.append('--psm ' + str(psm))
-            if oem is not None:
-                options.append('--oem ' + str(oem))
-            config = ' '.join(options) if options else ''
-            data = pytesseract.image_to_data(result.img, config=config, output_type=Output.DICT)
-            return self._push(TesseractOcrResult(data))
+            config = '--psm {} --oem {}'.format(psm, oem)
+            results = pytesseract.image_to_data(result.img, config=config, output_type=Output.DICT)
+            return self._push(TesseractOcrResult(result, results))
+
+    def locate_by_text(self, text: str):
+        result = self._pop()
+        if isinstance(result, TesseractOcrResult):
+            loc = result.locate_by_text(text)
+            if loc is None:
+                raise Exception("cannot find the text")
+            return self._push(loc)
+
