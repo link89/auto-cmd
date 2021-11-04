@@ -17,9 +17,9 @@ class Result:
 
 
 class ImageResult(Result):
-    def __init__(self, img: Image, scale=1):
+    def __init__(self, img: Image, scale: int):
         self.img = img
-        self.scale = 1
+        self.scale = scale
 
     def debug(self):
         pprint(self.img.info)
@@ -49,6 +49,13 @@ class RectResult(Result):
     @property
     def center(self):
         return self._x + self._w / 2, self._y + self._h / 2
+
+    def debug(self):
+        img = ImageGrab.grab()
+        draw = ImageDraw.Draw(img)
+        draw.rectangle(((self._x, self._y), (self._x + self._w, self._y + self._h)), outline='green', width=10)
+        print((self._x, self._y, self._w, self._h))
+        img.show()
 
 
 class TesseractOcrResult(Result):
@@ -105,9 +112,9 @@ class TesseractOcrResult(Result):
             if level_num != item.level or item.conf < 0:
                 continue
             if item.text == text:
-                w, h = self._img_result.img.size
                 scale = self._img_result.scale
                 return RectResult(item.left / scale, item.top / scale, item.width / scale, item.height / scale)
+
 
 class BaseVm:
 
@@ -150,13 +157,13 @@ class BaseVm:
 
     def take_screenshot(self, from_clipboard=False):
         img = ImageGrab.grabclipboard() if from_clipboard else ImageGrab.grab()
-        return self._push(ImageResult(img))
+        return self._push(ImageResult(img, 1))
 
     def grayscale(self):
         result = self._pop()
         if isinstance(result, ImageResult):
             img = result.img.convert('L')
-            return self._push(ImageResult(img))
+            return self._push(ImageResult(img, result.scale))
 
     def bi_level(self, range: tuple):
         result = self._pop()
@@ -165,7 +172,7 @@ class BaseVm:
         if isinstance(result, ImageResult):
             lut = lambda x: 0 if range[0] <= x < range[1] else 255
             img = result.img.point(lut, mode='1')
-            return self._push(ImageResult(img))
+            return self._push(ImageResult(img, result.scale))
 
     def resize(self, ratio: int):
         result = self._pop()
