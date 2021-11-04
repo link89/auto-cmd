@@ -1,3 +1,4 @@
+import time
 from PIL import ImageGrab, Image, ImageDraw
 from pprint import pprint
 import pytesseract
@@ -123,13 +124,6 @@ class BaseConfig:
 
 class BaseVm:
 
-    @staticmethod
-    def get_mouse_button(button: str):
-        return {
-            'left': Button.left,
-            'right': Button.right,
-        }[button]
-
     def __init__(self):
         self._stack = []
 
@@ -146,18 +140,20 @@ class BaseVm:
     def to_base64(self):
         result = self._pop()
         if callable(getattr(result, 'to_base64')):
-            return result.to_base64()
+            return self._push(result.to_base64())
 
     def debug(self, *args, **kwargs):
-        result = self._pop()
+        result = self._peek()
         if callable(getattr(result, 'debug')):
-            return result.debug(*args, **kwargs)
+            result.debug(*args, **kwargs)
+        else:
+            pprint(result)
 
     def click(self, button='left', count=1):
         result = self._peek()
         if isinstance(result, RectResult):
             mouse.position = result.center
-            mouse.click(self.get_mouse_button(button), count)
+            mouse.click(get_pynpy_mouse_button(button), count)
             return self
 
     def take_screenshot(self, from_clipboard=False):
@@ -172,10 +168,9 @@ class BaseVm:
 
     def bi_level(self, range: tuple):
         result = self._pop()
-        if type(range) is not tuple:
-            raise Exception('unsupported input')
         if isinstance(result, ImageResult):
-            lut = lambda x: 0 if range[0] <= x < range[1] else 255
+            a, b = range
+            lut = lambda x: 0 if a <= x < b else 255
             img = result.img.point(lut, mode='1')
             return self._push(ImageResult(img))
 
@@ -200,6 +195,12 @@ class BaseVm:
         if isinstance(result, TesseractOcrResult):
             loc = result.locate_by_text(text)
             if loc is None:
-                raise Exception("cannot find the text")
+                raise Exception("cannot find the text {}".format(text))
             return self._push(loc)
 
+
+def get_pynpy_mouse_button(button: str):
+    return {
+        'left': Button.left,
+        'right': Button.right,
+    }[button]
