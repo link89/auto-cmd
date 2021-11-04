@@ -28,7 +28,7 @@ class ImageResult(Result):
 
     def to_base64(self):
         buffered = BytesIO()
-        self.img.save(buffered, format="JPEG")
+        self.img.save(buffered, format="PNG")
         return base64.b64encode(buffered.getvalue())
 
 
@@ -144,7 +144,7 @@ class BaseVm:
 
     def debug(self, *args, **kwargs):
         result = self._peek()
-        if callable(getattr(result, 'debug')):
+        if hasattr(result, 'debug') and callable(getattr(result, 'debug')):
             result.debug(*args, **kwargs)
         else:
             pprint(result)
