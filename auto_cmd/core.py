@@ -17,9 +17,8 @@ class Result:
 
 
 class ImageResult(Result):
-    def __init__(self, img: Image, scale: int):
+    def __init__(self, img: Image):
         self.img = img
-        self.scale = scale
 
     def debug(self):
         pprint(self.img.info)
@@ -53,9 +52,12 @@ class RectResult(Result):
     def debug(self):
         img = ImageGrab.grab()
         draw = ImageDraw.Draw(img)
-        draw.rectangle(((self._x, self._y), (self._x + self._w, self._y + self._h)), outline='green', width=10)
+        draw.rectangle(((self._x, self._y), (self._x + self._w, self._y + self._h)), outline='green', width=4)
         print((self._x, self._y, self._w, self._h))
         img.show()
+
+    def scale(self, ratio: int):
+        return RectResult(self._x * ratio, self._y * ratio, self._w * ratio, self._h * ratio)
 
 
 class TesseractOcrResult(Result):
@@ -112,8 +114,11 @@ class TesseractOcrResult(Result):
             if level_num != item.level or item.conf < 0:
                 continue
             if item.text == text:
-                scale = self._img_result.scale
-                return RectResult(item.left / scale, item.top / scale, item.width / scale, item.height / scale)
+                return RectResult(item.left, item.top, item.width, item.height)
+
+
+class BaseConfig:
+    pass
 
 
 class BaseVm:
@@ -151,19 +156,19 @@ class BaseVm:
     def click(self, button='left', count=1):
         result = self._peek()
         if isinstance(result, RectResult):
-            mouse.move(*result.center)
+            mouse.position = result.center
             mouse.click(self.get_mouse_button(button), count)
             return self
 
     def take_screenshot(self, from_clipboard=False):
         img = ImageGrab.grabclipboard() if from_clipboard else ImageGrab.grab()
-        return self._push(ImageResult(img, 1))
+        return self._push(ImageResult(img))
 
     def grayscale(self):
         result = self._pop()
         if isinstance(result, ImageResult):
             img = result.img.convert('L')
-            return self._push(ImageResult(img, result.scale))
+            return self._push(ImageResult(img))
 
     def bi_level(self, range: tuple):
         result = self._pop()
@@ -172,14 +177,16 @@ class BaseVm:
         if isinstance(result, ImageResult):
             lut = lambda x: 0 if range[0] <= x < range[1] else 255
             img = result.img.point(lut, mode='1')
-            return self._push(ImageResult(img, result.scale))
+            return self._push(ImageResult(img))
 
-    def resize(self, ratio: int):
+    def scale(self, ratio: int):
         result = self._pop()
         if isinstance(result, ImageResult):
             w, h = result.img.size
             img = result.img.resize((w * ratio, h * ratio), resample=Image.ANTIALIAS)
-            return self._push(ImageResult(img, ratio))
+            return self._push(ImageResult(img))
+        if isinstance(result, RectResult):
+            return self._push(result.scale(ratio))
 
     def ocr(self, psm: int = 4, oem: int = 1):
         result = self._pop()
