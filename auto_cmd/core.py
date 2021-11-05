@@ -1,4 +1,7 @@
+from numbers import Number
 import time
+from functools import cache
+import tkinter as tk
 from PIL import ImageGrab, Image, ImageDraw
 from pprint import pprint
 import pytesseract
@@ -47,17 +50,19 @@ class RectResult(Result):
         self._h = h
 
     @property
-    def center(self):
+    def pos(self):
         return self._x + self._w / 2, self._y + self._h / 2
 
     def debug(self):
         img = ImageGrab.grab()
+        img = img.resize(get_screen_size())
         draw = ImageDraw.Draw(img)
+
         draw.rectangle(((self._x, self._y), (self._x + self._w, self._y + self._h)), outline='green', width=4)
         print((self._x, self._y, self._w, self._h))
         img.show()
 
-    def scale(self, ratio: int):
+    def scale(self, ratio: Number):
         return RectResult(self._x * ratio, self._y * ratio, self._w * ratio, self._h * ratio)
 
 
@@ -109,7 +114,7 @@ class TesseractOcrResult(Result):
             print("conf: {}".format(item.conf))
         img.show()
 
-    def locate_by_text(self, text: str):
+    def find_by_text(self, text: str):
         level_num = self.get_level('word')
         for item in self.iter_results():
             if level_num != item.level or item.conf < 0:
@@ -156,8 +161,15 @@ class BaseVm:
     def click(self, button='left', count=1):
         result = self._peek()
         if isinstance(result, RectResult):
-            mouse.position = result.center
-            mouse.click(get_pynput_mouse_button(button), count)
+            # move to
+            mouse.position = result.pos
+        mouse.click(get_pynput_mouse_button(button), count)
+        return self
+
+    def move_to(self):
+        result = self._peek()
+        if isinstance(result, RectResult):
+            mouse.position = result.pos
             return self
 
     def take_screenshot(self, from_clipboard=False):
@@ -194,13 +206,14 @@ class BaseVm:
             results = pytesseract.image_to_data(result.img, config=config, output_type=Output.DICT)
             return self._push(TesseractOcrResult(result, results))
 
-    def locate_by_text(self, text: str):
+    def find_by_text(self, text: str):
         result = self._pop()
         if isinstance(result, TesseractOcrResult):
-            loc = result.locate_by_text(text)
+            loc = result.find_by_text(text)
             if loc is None:
                 raise Exception("cannot find the text {}".format(text))
-            return self._push(loc)
+            scale = get_screen_scale_ratio()
+            return self._push(loc.scale(1 / scale))
 
 
 def get_pynput_mouse_button(button: str):
@@ -212,3 +225,21 @@ def get_pynput_mouse_button(button: str):
 
 def has_implement_protocol(obj, proto: str):
     return hasattr(obj, proto) and callable(getattr(obj, proto))
+
+
+@cache
+def get_screen_size():
+    root = tk.Tk()
+    size = root.winfo_screenwidth(), root.winfo_screenheight()
+    root.destroy()
+    return size
+
+@cache
+def get_resolution():
+    return ImageGrab.grab().size
+
+@cache
+def get_screen_scale_ratio():
+    resolution = get_resolution()
+    screen_size = get_screen_size()
+    return resolution[0] / screen_size[0]

@@ -1,13 +1,4 @@
-from .core import BaseVm, BaseConfig
-
-
-class MacConfig(BaseConfig):
-
-    def __init__(self):
-        pass
-
-    def init(self):
-        pass
+from .core import BaseVm
 
 
 class MacAutoCmd(BaseVm):
