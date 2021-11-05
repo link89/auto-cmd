@@ -10,6 +10,7 @@ import base64
 from io import BytesIO
 from collections import namedtuple
 from pynput.mouse import Button, Controller
+from uisoup import uisoup, ui_inspector
 
 
 # Singletons
@@ -139,6 +140,9 @@ class BaseVm:
     def _pop(self):
         return self._stack.pop()
 
+    def push_none(self):
+        return self._push(None)
+
     def _peek(self):
         return self._stack[-1]
 
@@ -162,14 +166,14 @@ class BaseVm:
         result = self._peek()
         if isinstance(result, RectResult):
             # move to
-            mouse.position = result.pos
+            uisoup.mouse.move(*result.pos, True)
         mouse.click(get_pynput_mouse_button(button), count)
         return self
 
     def move_to(self):
         result = self._peek()
         if isinstance(result, RectResult):
-            mouse.position = result.pos
+            uisoup.mouse.move(*result.pos, True)
             return self
 
     def take_screenshot(self, from_clipboard=False):

@@ -11,6 +11,7 @@ install_requirements = [
     'fire',
     'fastapi',
     'pynput',
+    'UISoup @ https://github.com/link89/UISoup/archive/refs/heads/fix_mac_python3.zip',
     'uvicorn',
     'pytesseract',
     'Pillow',
@@ -18,7 +19,7 @@ install_requirements = [
 
 if sys.platform == 'darwin':
     install_requirements.extend([
-        'atomac @ https://github.com/pyatom/pyatom/archive/master.zip',
+        "pyobjc-framework-Quartz",
     ])
 
 setup(
