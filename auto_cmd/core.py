@@ -1,3 +1,4 @@
+from typing import Tuple, Union
 from numbers import Number
 import time
 from functools import cache
@@ -10,7 +11,8 @@ import base64
 from io import BytesIO
 from collections import namedtuple
 from pynput.mouse import Button, Controller
-from uisoup import uisoup, ui_inspector
+from uisoup import uisoup
+import webbrowser
 
 
 # Singletons
@@ -24,6 +26,22 @@ class Result:
 class ImageResult(Result):
     def __init__(self, img: Image):
         self.img = img
+
+    def limit_by_grid(self, grid: Tuple[int], indexes: Union[int, Tuple[int]]):
+        draw = ImageDraw.Draw(self.img)
+        width, height = self.img.size
+        row, col = grid
+        width_step = int(width / col)
+        height_step = int(height / row)
+
+        indexes = set(indexes) if isinstance(indexes, tuple) else {indexes}
+        for row_num in range(row):
+            for col_num in range(col):
+                if (row_num * col + col_num) not in indexes:
+                    x = (col_num * width_step, row_num * height_step)
+                    y = (x[0] + width_step, x[1] + height_step)
+                    draw.rectangle((x, y), fill='black')
+        return self
 
     def debug(self):
         pprint(self.img.info)
@@ -176,6 +194,10 @@ class BaseVm:
             uisoup.mouse.move(*result.pos, True)
             return self
 
+    def open_browser(self, *args, **kwargs):
+        webbrowser.open(*args, **kwargs)
+        return self
+
     def take_screenshot(self, from_clipboard=False):
         img = ImageGrab.grabclipboard() if from_clipboard else ImageGrab.grab()
         return self._push(ImageResult(img))
@@ -186,7 +208,7 @@ class BaseVm:
             img = result.img.convert('L')
             return self._push(ImageResult(img))
 
-    def bi_level(self, range: tuple):
+    def bi_level(self, range: Tuple[int]):
         result = self._pop()
         if isinstance(result, ImageResult):
             a, b = range
@@ -218,6 +240,11 @@ class BaseVm:
                 raise Exception("cannot find the text {}".format(text))
             scale = get_screen_scale_ratio()
             return self._push(loc.scale(1 / scale))
+
+    def limit_by_grid(self, grid: Tuple[int], indexes: Union[int, Tuple[int]]):
+        result = self._pop()
+        if isinstance(result, ImageResult):
+            return self._push(result.limit_by_grid(grid, indexes))
 
 
 def get_pynput_mouse_button(button: str):
