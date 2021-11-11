@@ -3,7 +3,7 @@ from numbers import Number
 import time
 from functools import cache
 import tkinter as tk
-from PIL import ImageGrab, Image, ImageDraw
+from PIL import ImageGrab, Image, ImageDraw, ImageFont
 from pprint import pprint
 import pytesseract
 from pytesseract import Output
@@ -14,6 +14,7 @@ from pynput.mouse import Button, Controller
 from uisoup import uisoup
 import webbrowser
 
+from .res import arial_ttf_path
 
 # Singletons
 mouse = Controller()
@@ -27,20 +28,33 @@ class ImageResult(Result):
     def __init__(self, img: Image):
         self.img = img
 
-    def limit_by_grid(self, grid: Tuple[int], indexes: Union[int, Tuple[int]]):
-        draw = ImageDraw.Draw(self.img)
+    def _iter_grids(self, grid: Tuple[int, int]):
         width, height = self.img.size
-        row, col = grid
-        width_step = int(width / col)
-        height_step = int(height / row)
+        total_row, total_col = grid
+        width_step = int(width / total_col)
+        height_step = int(height / total_row)
+        for row_idx in range(total_row):
+            for col_idx in range(total_col):
+                i = row_idx * total_col + col_idx
+                x = (col_idx * width_step, row_idx * height_step)
+                y = (x[0] + width_step, x[1] + height_step)
+                yield i, x, y
 
+    def select_grid(self, grid: Tuple[int, int], indexes: Union[int, tuple]):
+        draw = ImageDraw.Draw(self.img)
         indexes = set(indexes) if isinstance(indexes, tuple) else {indexes}
-        for row_num in range(row):
-            for col_num in range(col):
-                if (row_num * col + col_num) not in indexes:
-                    x = (col_num * width_step, row_num * height_step)
-                    y = (x[0] + width_step, x[1] + height_step)
-                    draw.rectangle((x, y), fill='black')
+        for i, x, y in self._iter_grids(grid):
+            if i not in indexes:
+                draw.rectangle((x, y), fill='black')
+        return self
+
+    def show_grid(self, grid: Tuple[int, int]):
+        draw = ImageDraw.Draw(self.img)
+        font = ImageFont.truetype(arial_ttf_path, size=40)
+        for i, x, y in self._iter_grids(grid):
+            draw.rectangle((x, y))
+            draw.text(x, text=str(i), font=font)
+        self.img.show()
         return self
 
     def debug(self):
@@ -241,10 +255,15 @@ class BaseVm:
             scale = get_screen_scale_ratio()
             return self._push(loc.scale(1 / scale))
 
-    def limit_by_grid(self, grid: Tuple[int], indexes: Union[int, Tuple[int]]):
+    def select_grid(self, grid: Tuple[int, int], indexes: Union[int, tuple]):
         result = self._pop()
         if isinstance(result, ImageResult):
-            return self._push(result.limit_by_grid(grid, indexes))
+            return self._push(result.select_grid(grid, indexes))
+
+    def show_grid(self, grid: Tuple[int, int]):
+        result = self._pop()
+        if isinstance(result, ImageResult):
+            return self._push(result.show_grid(grid))
 
 
 def get_pynput_mouse_button(button: str):
