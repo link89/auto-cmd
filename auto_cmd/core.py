@@ -274,7 +274,7 @@ def send_video_to_virtual_camera(timeout = 10):
     with pyvirtualcam.Camera(width=1280, height=720, fps=20) as cam:
         print(f'Using virtual camera: {cam.device}')
         frame = np.zeros((cam.height, cam.width, 3), np.uint8)  # RGB
-        due = time.time() + timeout * 1e3
+        due = time.time() + timeout
 
         while time.time() < due:
             frame[:] = cam.frames_sent % 255  # grayscale animation
