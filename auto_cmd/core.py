@@ -1,7 +1,7 @@
 from typing import Tuple, Union
 from numbers import Number
 import time
-from functools import cache
+from functools import lru_cache
 import tkinter as tk
 from PIL import ImageGrab, Image, ImageDraw, ImageFont
 from pprint import pprint
@@ -294,18 +294,20 @@ def has_implement_protocol(obj, proto: str):
     return hasattr(obj, proto) and callable(getattr(obj, proto))
 
 
-@cache
+@lru_cache(maxsize=None)
 def get_screen_size():
     root = tk.Tk()
     size = root.winfo_screenwidth(), root.winfo_screenheight()
     root.destroy()
     return size
 
-@cache
+
+@lru_cache(maxsize=None)
 def get_resolution():
     return ImageGrab.grab().size
 
-@cache
+
+@lru_cache(maxsize=None)
 def get_screen_scale_ratio():
     resolution = get_resolution()
     screen_size = get_screen_size()
