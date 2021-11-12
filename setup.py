@@ -22,7 +22,7 @@ install_requirements = [
 if sys.platform == 'darwin':
     install_requirements.extend([
         "pyobjc-framework-Quartz==7.3",
-        "pyobjc-core=7.3",
+        "pyobjc-core==7.3",
         "pyobjc-framework-ApplicationServices==7.3",
         "pyobjc-framework-Cocoa==7.3",
         "pyobjc-framework-CoreText==7.3",
