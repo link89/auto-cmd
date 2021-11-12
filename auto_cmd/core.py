@@ -270,6 +270,7 @@ class BaseVm:
     def send_video_to_virtual_camera(self):
         send_video_to_virtual_camera()
 
+
 def send_video_to_virtual_camera(timeout = 10):
     with pyvirtualcam.Camera(width=1280, height=720, fps=20) as cam:
         print(f'Using virtual camera: {cam.device}')
