@@ -147,7 +147,7 @@ class TesseractOcrResult(Result):
             print("conf: {}".format(item.conf))
         img.show()
 
-    def find_by_text(self, text: str):
+    def find_text(self, text: str):
         level_num = self.get_level('word')
         for item in self.iter_results():
             if level_num != item.level or item.conf < 0:
@@ -246,10 +246,10 @@ class BaseVm:
             results = pytesseract.image_to_data(result.img, config=config, output_type=Output.DICT)
             return self._push(TesseractOcrResult(result, results))
 
-    def find_by_text(self, text: str):
+    def find_text(self, text: str):
         result = self._pop()
         if isinstance(result, TesseractOcrResult):
-            loc = result.find_by_text(text)
+            loc = result.find_text(text)
             if loc is None:
                 raise Exception("cannot find the text {}".format(text))
             scale = get_screen_scale_ratio()
