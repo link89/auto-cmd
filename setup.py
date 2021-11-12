@@ -21,7 +21,7 @@ install_requirements = [
 
 if sys.platform == 'darwin':
     install_requirements.extend([
-        "pyobjc-framework-Quartz",
+        "pyobjc-framework-Quartz==7.3",
     ])
 
 setup(
