@@ -15,6 +15,8 @@ install_requirements = [
     'uvicorn',
     'pytesseract',
     'Pillow',
+    'pyvirtualcam',
+    'numpy',
 ]
 
 if sys.platform == 'darwin':
