@@ -12,6 +12,8 @@ from io import BytesIO
 from collections import namedtuple
 from pynput.mouse import Button, Controller
 from uisoup import uisoup
+import pyvirtualcam
+import numpy as np
 import webbrowser
 
 from .res import arial_ttf_path
@@ -264,6 +266,20 @@ class BaseVm:
         result = self._pop()
         if isinstance(result, ImageResult):
             return self._push(result.show_grid(grid))
+
+    def send_video_to_virtual_camera(self):
+        send_video_to_virtual_camera()
+
+def send_video_to_virtual_camera(timeout = 10):
+    with pyvirtualcam.Camera(width=1280, height=720, fps=20) as cam:
+        print(f'Using virtual camera: {cam.device}')
+        frame = np.zeros((cam.height, cam.width, 3), np.uint8)  # RGB
+        due = time.time() + timeout * 1e3
+
+        while time.time() < due:
+            frame[:] = cam.frames_sent % 255  # grayscale animation
+            cam.send(frame)
+            cam.sleep_until_next_frame()
 
 
 def get_pynput_mouse_button(button: str):
