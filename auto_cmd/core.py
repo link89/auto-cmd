@@ -3,7 +3,7 @@ from numbers import Number
 import time
 from functools import lru_cache
 import tkinter as tk
-from PIL import ImageGrab, Image, ImageDraw, ImageFont
+from PIL import ImageGrab, Image, ImageDraw
 from pprint import pprint
 import pytesseract
 from pytesseract import Output
@@ -11,53 +11,23 @@ import base64
 from io import BytesIO
 from collections import namedtuple
 from pynput.mouse import Button, Controller
-from uisoup import uisoup
 import pyvirtualcam
 import numpy as np
 import webbrowser
-
-from .res import arial_ttf_path
 
 # Singletons
 mouse = Controller()
 
 
 class Result:
-    pass
+
+    def to_data(self):
+        return str(self)
 
 
 class ImageResult(Result):
     def __init__(self, img: Image):
         self.img = img
-
-    def _iter_grids(self, grid: Tuple[int, int]):
-        width, height = self.img.size
-        total_row, total_col = grid
-        width_step = int(width / total_col)
-        height_step = int(height / total_row)
-        for row_idx in range(total_row):
-            for col_idx in range(total_col):
-                i = row_idx * total_col + col_idx
-                x = (col_idx * width_step, row_idx * height_step)
-                y = (x[0] + width_step, x[1] + height_step)
-                yield i, x, y
-
-    def select_grid(self, grid: Tuple[int, int], indexes: Union[int, tuple]):
-        draw = ImageDraw.Draw(self.img)
-        indexes = set(indexes) if isinstance(indexes, tuple) else {indexes}
-        for i, x, y in self._iter_grids(grid):
-            if i not in indexes:
-                draw.rectangle((x, y), fill='black')
-        return self
-
-    def show_grid(self, grid: Tuple[int, int]):
-        draw = ImageDraw.Draw(self.img)
-        font = ImageFont.truetype(arial_ttf_path, size=40)
-        for i, x, y in self._iter_grids(grid):
-            draw.rectangle((x, y))
-            draw.text(x, text=str(i), font=font)
-        self.img.show()
-        return self
 
     def debug(self):
         pprint(self.img.info)
@@ -69,11 +39,13 @@ class ImageResult(Result):
         self.img.save(buffered, format="PNG")
         return base64.b64encode(buffered.getvalue())
 
+    def to_data(self):
+        return self.to_base64()
+
 
 TesseractItem = namedtuple('TesseractItem', [
     'level', 'page_num', 'block_num', 'par_num', 'line_num', 'word_num',
-    'text',
-    'left', 'top', 'width', 'height', 'conf'])
+    'text', 'left', 'top', 'width', 'height', 'conf'])
 
 
 class RectResult(Result):
@@ -92,7 +64,6 @@ class RectResult(Result):
         img = ImageGrab.grab()
         img = img.resize(get_screen_size())
         draw = ImageDraw.Draw(img)
-
         draw.rectangle(((self._x, self._y), (self._x + self._w, self._y + self._h)), outline='green', width=4)
         print((self._x, self._y, self._w, self._h))
         img.show()
@@ -200,14 +171,14 @@ class BaseVm:
         result = self._peek()
         if isinstance(result, RectResult):
             # move to
-            uisoup.mouse.move(*result.pos, True)
+            mouse_move(*result.pos, True)
         mouse.click(get_pynput_mouse_button(button), count)
         return self
 
     def move_to(self):
         result = self._peek()
         if isinstance(result, RectResult):
-            uisoup.mouse.move(*result.pos, True)
+            mouse_move(*result.pos, True)
             return self
 
     def open_browser(self, *args, **kwargs):
@@ -224,7 +195,7 @@ class BaseVm:
             img = result.img.convert('L')
             return self._push(ImageResult(img))
 
-    def bi_level(self, range: Tuple[int]):
+    def bi_level(self, range: Tuple[int, int]):
         result = self._pop()
         if isinstance(result, ImageResult):
             a, b = range
@@ -241,6 +212,9 @@ class BaseVm:
         if isinstance(result, RectResult):
             return self._push(result.scale(ratio))
 
+    def nullify_display_scale(self):
+        return self.scale(1 / get_screen_scale_ratio())
+
     def ocr(self, psm: int = 4, oem: int = 1):
         result = self._pop()
         if isinstance(result, ImageResult):
@@ -254,18 +228,7 @@ class BaseVm:
             loc = result.find_by_text(text)
             if loc is None:
                 raise Exception("cannot find the text {}".format(text))
-            scale = get_screen_scale_ratio()
-            return self._push(loc.scale(1 / scale))
-
-    def select_grid(self, grid: Tuple[int, int], indexes: Union[int, tuple]):
-        result = self._pop()
-        if isinstance(result, ImageResult):
-            return self._push(result.select_grid(grid, indexes))
-
-    def show_grid(self, grid: Tuple[int, int]):
-        result = self._pop()
-        if isinstance(result, ImageResult):
-            return self._push(result.show_grid(grid))
+            return self._push(loc)
 
     def send_video_to_virtual_camera(self):
         send_video_to_virtual_camera()
@@ -288,6 +251,16 @@ def get_pynput_mouse_button(button: str):
         'left': Button.left,
         'right': Button.right,
     }[button]
+
+
+def mouse_move(x, y, smooth=True):
+    old_x, old_y = mouse.position
+    for i in range(100):
+        intermediate_x = old_x + (x - old_x) * (i + 1) / 100.0
+        intermediate_y = old_y + (y - old_y) * (i + 1) / 100.0
+        mouse.position = (intermediate_x, intermediate_y)
+        if smooth:
+            time.sleep(.01)
 
 
 def has_implement_protocol(obj, proto: str):
