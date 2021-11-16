@@ -15,7 +15,7 @@ import pyvirtualcam
 import numpy as np
 import webbrowser
 import json
-import math
+from math import floor
 
 from .utils import get_stacktrace_from_exception
 
@@ -61,6 +61,11 @@ class ImageResult(Result):
         self.img.save(buffered, format="PNG")
         return base64.b64encode(buffered.getvalue()).decode('ascii')
 
+    def scale(self, ratio: float):
+        w, h = self.img.size
+        img = self.img.resize((floor(w * ratio), floor(h * ratio)), resample=Image.ANTIALIAS)
+        return ImageResult(img)
+
     def to_data(self):
         w, h = self.img.size
         data = {
@@ -92,8 +97,7 @@ class RectResult(Result):
         return self._x + self._w / 2, self._y + self._h / 2
 
     def debug(self):
-        img = ImageGrab.grab()
-        img = img.resize(get_screen_size())
+        img = ImageGrab.grab().resize(get_screen_size())
         draw = ImageDraw.Draw(img)
         draw.rectangle(((self._x, self._y), (self._x + self._w, self._y + self._h)), outline='green', width=4)
         print((self._x, self._y, self._w, self._h))
@@ -264,9 +268,7 @@ class BaseVm:
     def scale(self, ratio: int):
         result = self._pop()
         if isinstance(result, ImageResult):
-            w, h = result.img.size
-            img = result.img.resize((w * ratio, h * ratio), resample=Image.ANTIALIAS)
-            return self._push(ImageResult(img))
+            return self._push(result.scale(ratio))
         if isinstance(result, RectResult):
             return self._push(result.scale(ratio))
 
