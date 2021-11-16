@@ -38,7 +38,7 @@ class ImageResult(Result):
     def to_base64(self):
         buffered = BytesIO()
         self.img.save(buffered, format="PNG")
-        return base64.b64encode(buffered.getvalue())
+        return base64.b64encode(buffered.getvalue()).decode('ascii')
 
     def to_data(self):
         w, h = self.img.size
