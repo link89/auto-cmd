@@ -71,7 +71,7 @@ class ImageResult(Result):
         mask = Image.new('L', self.img.size, 0)
         draw = ImageDraw.Draw(mask)
 
-        # if the coordinate is relative
+        # if the coordinate is relative, convert to absolute
         if all(map(lambda z: z <= 1, (*x, *y))):
             img_w, img_h = self.img.size
             x = (floor(x[0] * img_w), floor(x[1] * img_h))
