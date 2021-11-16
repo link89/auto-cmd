@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Tuple
 from numbers import Number
 import time
 from functools import lru_cache
@@ -14,6 +14,7 @@ from pynput.mouse import Button, Controller
 import pyvirtualcam
 import numpy as np
 import webbrowser
+import json
 
 # Singletons
 mouse = Controller()
@@ -40,7 +41,16 @@ class ImageResult(Result):
         return base64.b64encode(buffered.getvalue())
 
     def to_data(self):
-        return self.to_base64()
+        w, h = self.img.size
+        data = {
+            'size': {
+                'width': w,
+                'height': h,
+            },
+            'type': 'image/png;base64',
+            'content': self.to_base64(),
+        }
+        return data
 
 
 TesseractItem = namedtuple('TesseractItem', [
@@ -70,6 +80,15 @@ class RectResult(Result):
 
     def scale(self, ratio: Number):
         return RectResult(self._x * ratio, self._y * ratio, self._w * ratio, self._h * ratio)
+
+    def to_data(self):
+        data = {
+            'x': self._x,
+            'y': self._y,
+            'w': self._w,
+            'h': self._h,
+        }
+        return data
 
 
 class TesseractOcrResult(Result):
@@ -120,13 +139,16 @@ class TesseractOcrResult(Result):
             print("conf: {}".format(item.conf))
         img.show()
 
-    def find_by_text(self, text: str):
+    def find_location_by_text(self, text: str):
         level_num = self.get_level('word')
         for item in self.iter_results():
             if level_num != item.level or item.conf < 0:
                 continue
             if item.text == text:
                 return RectResult(item.left, item.top, item.width, item.height)
+
+    def to_data(self):
+        return self._results
 
 
 class BaseConfig:
@@ -138,6 +160,21 @@ class BaseVm:
     def __init__(self):
         self._stack = []
 
+    def to_data(self):
+        if not self._stack:
+            return None
+        ret = self._peek()
+        if ret is None:
+            return None
+        if any(map(lambda cls: isinstance(ret, cls), [int, float, str])):
+            return ret
+        if has_implement_protocol(ret, 'to_data'):
+            return ret.to_data()
+        return ret
+
+    def __str__(self):
+        return json.dumps(self.to_data())
+
     def _push(self, result):
         self._stack.append(result)
         return self
@@ -145,18 +182,18 @@ class BaseVm:
     def _pop(self):
         return self._stack.pop()
 
-    def push_none(self):
-        return self._push(None)
-
     def _peek(self):
         return self._stack[-1]
+
+    def push_none(self):
+        return self._push(None)
 
     def debug(self, *args, **kwargs):
         result = self._peek()
         if has_implement_protocol(result, 'debug'):
             result.debug(*args, **kwargs)
         else:
-            pprint(result)
+            pprint(self.to_data())
 
     def sleep(self, sec: int):
         time.sleep(sec)
@@ -222,16 +259,14 @@ class BaseVm:
             results = pytesseract.image_to_data(result.img, config=config, output_type=Output.DICT)
             return self._push(TesseractOcrResult(result, results))
 
-    def find_by_text(self, text: str):
+    def find_location(self, text: str):
         result = self._pop()
         if isinstance(result, TesseractOcrResult):
-            loc = result.find_by_text(text)
-            if loc is None:
-                raise Exception("cannot find the text {}".format(text))
+            loc = result.find_location_by_text(text)
             return self._push(loc)
 
-    def send_video_to_virtual_camera(self):
-        send_video_to_virtual_camera()
+    def play_to_camera(self, url: str, timeout=10.0):
+        pass
 
 
 def send_video_to_virtual_camera(timeout = 10):

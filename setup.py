@@ -16,6 +16,7 @@ install_requirements = [
     'Pillow',
     'pyvirtualcam',
     'numpy',
+    'opencv-python',
 ]
 
 if sys.platform == 'darwin':
