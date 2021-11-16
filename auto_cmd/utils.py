@@ -1,5 +1,5 @@
-from itertools import islice
+import traceback
 
+def get_stacktrace_from_exception(e: Exception):
+    return "".join(traceback.TracebackException.from_exception(e).format())
 
-def next_n(it, n):
-    return next(islice(it, n, None))

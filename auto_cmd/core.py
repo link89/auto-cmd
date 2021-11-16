@@ -15,9 +15,30 @@ import pyvirtualcam
 import numpy as np
 import webbrowser
 import json
+import math
+
+from .utils import get_stacktrace_from_exception
 
 # Singletons
 mouse = Controller()
+
+
+class AutoCmdError(Exception):
+    def __init__(self, code: int, error: str, message: str, data: dict = None):
+        self.code = code
+        self.error = error
+        self.message = message
+        self.data = data
+
+    def to_data(self):
+        data = dict(
+            code=self.code,
+            error=self.error,
+            message=self.message,
+            stacktrace=get_stacktrace_from_exception(self),
+        )
+        if self.data is not None:
+            data['data'] = self.data
 
 
 class Result:
