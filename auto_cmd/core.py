@@ -194,6 +194,7 @@ class BaseConfig:
 
 
 class BaseVm:
+    is_quiet = False
 
     def __init__(self):
         self._stack = []
@@ -211,6 +212,8 @@ class BaseVm:
         return ret
 
     def __str__(self):
+        if self.is_quiet:
+            return ''
         return json.dumps(self.to_data())
 
     def _push(self, result):

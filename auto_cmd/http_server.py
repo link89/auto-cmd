@@ -17,6 +17,7 @@ app = FastAPI()
 
 @app.post("/auto-cmd/", status_code=200)
 def auto_cmd(command: Command, response: Response):
+    AutoCmd.is_quiet = True
     try:
         ret = Fire(AutoCmd, command.args)
         return {
