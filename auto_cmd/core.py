@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Union
 from numbers import Number
 import time
 from functools import lru_cache
@@ -65,6 +65,19 @@ class ImageResult(Result):
         w, h = self.img.size
         img = self.img.resize((floor(w * ratio), floor(h * ratio)), resample=Image.ANTIALIAS)
         return ImageResult(img)
+
+    def mask_rect(self, x: Tuple[float, float], y: Tuple[float, float]):
+        back = Image.new(self.img.mode, self.img.size)
+        mask = Image.new('L', self.img.size, 0)
+        draw = ImageDraw.Draw(mask)
+
+        # if the coordinate is relative
+        if all(map(lambda z: z <= 1, (*x, *y))):
+            img_w, img_h = self.img.size
+            x = (floor(x[0] * img_w), floor(x[1] * img_h))
+            y = (floor(y[0] * img_w), floor(y[1] * img_h))
+        draw.rectangle((x, y), fill=255)
+        return ImageResult(Image.composite(self.img, back, mask))
 
     def to_data(self):
         w, h = self.img.size
@@ -264,6 +277,11 @@ class BaseVm:
             lut = lambda x: 0 if a <= x < b else 255
             img = result.img.point(lut, mode='1')
             return self._push(ImageResult(img))
+
+    def mask_rect(self, x: Tuple[float, float], y: Tuple[float, float]):
+        result = self._pop()
+        if isinstance(result, ImageResult):
+            return self._push(result.mask_rect(x, y))
 
     def scale(self, ratio: int):
         result = self._pop()
