@@ -17,6 +17,7 @@ install_requirements = [
     'pyvirtualcam',
     'numpy',
     'opencv-python',
+    'mss',
 ]
 
 if sys.platform == 'darwin':

@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Tuple
 from numbers import Number
 import time
 from functools import lru_cache
@@ -193,7 +193,7 @@ class BaseConfig:
     pass
 
 
-class BaseVm:
+class CommonCmd:
     is_quiet = False
 
     def __init__(self):
@@ -209,11 +209,11 @@ class BaseVm:
             return ret
         if has_implement_protocol(ret, 'to_data'):
             return ret.to_data()
-        return ret
+        return str(ret)
 
     def __str__(self):
         if self.is_quiet:
-            return ''
+            return str(self._peek())
         return json.dumps(self.to_data())
 
     def _push(self, result):
