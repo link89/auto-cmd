@@ -15,6 +15,7 @@ import pyvirtualcam
 import numpy as np
 import webbrowser
 import json
+import sys
 from math import floor
 
 from .utils import get_stacktrace_from_exception
@@ -228,6 +229,9 @@ class CommonCmd:
 
     def health_check(self):
         return 'OK'
+
+    def get_platform(self):
+        return sys.platform
 
     def push_none(self):
         return self._push(None)
