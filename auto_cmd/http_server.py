@@ -21,7 +21,7 @@ def auto_cmd(command: Command, response: Response):
     try:
         ret = Fire(AutoCmd, command.args)
         return {
-            'result': ret.to_data(),
+            'result': ret.to_data() if hasattr(ret, 'to_data') else ret,
         }
     except AutoCmdError as e:
         response.status_code = e.code

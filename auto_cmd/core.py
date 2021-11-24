@@ -227,8 +227,7 @@ class CommonCmd:
         return self._stack[-1]
 
     def health_check(self):
-        self._push('OK')
-        return
+        return 'OK'
 
     def push_none(self):
         return self._push(None)
