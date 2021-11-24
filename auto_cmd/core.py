@@ -226,6 +226,10 @@ class CommonCmd:
     def _peek(self):
         return self._stack[-1]
 
+    def health_check(self):
+        self._push('OK')
+        return
+
     def push_none(self):
         return self._push(None)
 
