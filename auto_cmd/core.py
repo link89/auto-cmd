@@ -3,7 +3,7 @@ import time
 from functools import lru_cache
 import tkinter as tk
 from PIL import ImageGrab, Image, ImageDraw
-from pprint import pprint
+from pprint import pprint as print
 import pytesseract
 from pytesseract import Output
 import base64
@@ -105,8 +105,8 @@ class ImageOperand(Operand):
 
     def ocr(self, psm: int = 4, oem: int = 1):
         config = '--psm {} --oem {}'.format(psm, oem)
-        results = pytesseract.image_to_data(self.img, config=config, output_type=Output.DICT)
-        return TesseractOcrOperand(self, results)
+        ocr_data = pytesseract.image_to_data(self.img, config=config, output_type=Output.DICT)
+        return TesseractOcrOperand(self, ocr_data)
 
     def mask(self, op):
         area = op.area
@@ -123,7 +123,7 @@ class ImageOperand(Operand):
                 right_button = (floor(right_button[0] * img_w), floor(right_button[1] * img_h))
             draw.rectangle((left_top, right_button), fill=255)
             return ImageOperand(Image.composite(self.img, back, mask))
-        raise ValueError('area must be type one of RectResult')
+        raise ValueError('area must be type one of RectOprand')
 
     def to_data(self, with_content=True):
         w, h = self.img.size
@@ -147,7 +147,7 @@ TesseractItem = namedtuple('TesseractItem', [
 class TesseractOcrOperand(Operand):
 
     @staticmethod
-    def get_level(name: str):
+    def get_level_code(name: str):
         return {
             'page': 1,
             'block': 2,
@@ -157,34 +157,31 @@ class TesseractOcrOperand(Operand):
             'word': 5,
         }[name]
 
-    def __init__(self, img_result: ImageOperand, results):
-        self._img_result = img_result
-        self._results = results
-
-    def iter_results(self):
-        for i, _ in enumerate(self._results["text"]):
-            yield TesseractItem(
-                level=self._results["level"][i],
-                page_num=self._results["page_num"][i],
-                block_num=self._results["block_num"][i],
-                par_num=self._results["par_num"][i],
-                line_num=self._results["line_num"][i],
-                word_num=self._results["word_num"][i],
-                text=self._results["text"][i],
-                top=self._results["top"][i],
-                left=self._results["left"][i],
-                width=self._results["width"][i],
-                height=self._results["height"][i],
-                conf=self._results["conf"][i],
-            )
+    def __init__(self, img_op: ImageOperand, ocr_data):
+        self._img_op = img_op
+        self._ocr_data = []
+        for i, _ in enumerate(ocr_data["text"]):
+            self._ocr_data.append(TesseractItem(
+                level=ocr_data["level"][i],
+                page_num=ocr_data["page_num"][i],
+                block_num=ocr_data["block_num"][i],
+                par_num=ocr_data["par_num"][i],
+                line_num=ocr_data["line_num"][i],
+                word_num=ocr_data["word_num"][i],
+                text=ocr_data["text"][i],
+                top=ocr_data["top"][i],
+                left=ocr_data["left"][i],
+                width=ocr_data["width"][i],
+                height=ocr_data["height"][i],
+                conf=ocr_data["conf"][i],
+            ))
 
     def debug(self, level='word'):
-        level_num = self.get_level(level)
-        img = self._img_result.img.convert("RGBA")
+        level_num = self.get_level_code(level)
+        img = self._img_op.img.convert("RGBA")
         draw = ImageDraw.Draw(img)
-        for item in self.iter_results():
-            if level_num != item.level:
-                continue
+
+        for item in filter(lambda o: o.level == level_num, self._ocr_data):
             draw.rectangle(((item.left, item.top), (item.left+item.width, item.top+item.height)), outline='green', width=4)
             print("=" * 30)
             print("text: {}".format(item.text))
@@ -192,16 +189,16 @@ class TesseractOcrOperand(Operand):
             print("conf: {}".format(item.conf))
         img.show()
 
-    def find(self, text: str):
-        level_num = self.get_level('word')
-        for item in self.iter_results():
+    def find(self, text: str, level='word'):
+        level_num = self.get_level_code(level)
+        for item in self._ocr_data:
             if level_num != item.level or item.conf < 0:
                 continue
             if item.text == text:
                 return RectangleOperand(item.left, item.top, item.width, item.height)
 
     def to_data(self):
-        return self._results
+        return self._ocr_data
 
 
 class PositionOperand(Operand):
@@ -240,8 +237,8 @@ class CommonCmd:
             return str(self._peek())
         return json.dumps(self.to_data(), default=lambda o: str(type(o)))
 
-    def _push(self, result):
-        self._stack.append(result)
+    def _push(self, op):
+        self._stack.append(op)
         return self
 
     def _pop(self):
@@ -260,11 +257,11 @@ class CommonCmd:
         return self._push(None)
 
     def debug(self, *args, **kwargs):
-        result = self._peek()
-        if has_implement_protocol(result, 'debug'):
-            result.debug(*args, **kwargs)
+        op = self._peek()
+        if has_implement_protocol(op, 'debug'):
+            op.debug(*args, **kwargs)
         else:
-            pprint(self.to_data())
+            print(self.to_data())
 
     def sleep(self, sec: int):
         time.sleep(sec)
