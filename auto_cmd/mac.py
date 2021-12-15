@@ -1,4 +1,4 @@
-from .core import CommonCmd, Result, PositionResult, RectangleResult
+from .core import CommonCmd, Result, RectangleResult
 from typing import List
 import atomac
 from atomac import NativeUIElement
