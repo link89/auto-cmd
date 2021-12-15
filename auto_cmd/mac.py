@@ -1,4 +1,4 @@
-from .core import CommonCmd, Result, PositionResult, RectResult
+from .core import CommonCmd, Result, PositionResult, RectangleResult
 from typing import List
 import atomac
 from atomac import NativeUIElement
@@ -20,7 +20,7 @@ class MacUiElementResult(Result):
     def area(self):
         x, y = getattr(self.element, 'AXPosition')
         w, h = self.size
-        return RectResult(x, y, w, h)
+        return RectangleResult(x, y, w, h)
 
     def move_to(self, *args, **kwargs):
         return self.position.move_to(*args, **kwargs)

@@ -46,7 +46,7 @@ class Result:
         return str(self)
 
 
-class RectResult(Result):
+class RectangleResult(Result):
     def __init__(self, x, y, w, h):
         self.x = x
         self.y = y
@@ -64,7 +64,7 @@ class RectResult(Result):
         print(self.to_data())
 
     def scale(self, ratio: Real):
-        return RectResult(self.x * ratio, self.y * ratio, self.w * ratio, self.h * ratio)
+        return RectangleResult(self.x * ratio, self.y * ratio, self.w * ratio, self.h * ratio)
 
     def to_data(self):
         data = {
@@ -110,7 +110,7 @@ class ImageResult(Result):
 
     def mask(self, op):
         area = op.area
-        if isinstance(area, RectResult):
+        if isinstance(area, RectangleResult):
             back = Image.new(self.img.mode, self.img.size)
             mask = Image.new('L', self.img.size, 0)
             draw = ImageDraw.Draw(mask)
@@ -198,7 +198,7 @@ class TesseractOcrResult(Result):
             if level_num != item.level or item.conf < 0:
                 continue
             if item.text == text:
-                return RectResult(item.left, item.top, item.width, item.height)
+                return RectangleResult(item.left, item.top, item.width, item.height)
 
     def to_data(self):
         return self._results
