@@ -1,5 +1,4 @@
-from typing import Tuple
-from numbers import Number
+from numbers import Real
 import time
 from functools import lru_cache
 import tkinter as tk
@@ -43,9 +42,38 @@ class AutoCmdError(Exception):
 
 
 class Result:
-
     def to_data(self):
         return str(self)
+
+
+class RectResult(Result):
+    def __init__(self, x, y, w, h):
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+
+    @property
+    def position(self):
+        return PositionResult(self.x + self.w / 2, self.y + self.h / 2)
+
+    def move_to(self, *args, **kwargs):
+        return self.position.move_to(*args, **kwargs)
+
+    def debug(self):
+        print(self.to_data())
+
+    def scale(self, ratio: Real):
+        return RectResult(self.x * ratio, self.y * ratio, self.w * ratio, self.h * ratio)
+
+    def to_data(self):
+        data = {
+            'x': self.x,
+            'y': self.y,
+            'w': self.w,
+            'h': self.h,
+        }
+        return data
 
 
 class ImageResult(Result):
@@ -53,8 +81,7 @@ class ImageResult(Result):
         self.img = img
 
     def debug(self):
-        pprint(self.img.info)
-        pprint(self.img.size)
+        print(self.to_data(False))
         self.img.show()
 
     def to_base64(self):
@@ -62,25 +89,43 @@ class ImageResult(Result):
         self.img.save(buffered, format="PNG")
         return base64.b64encode(buffered.getvalue()).decode('ascii')
 
-    def scale(self, ratio: float):
+    def grayscale(self):
+        img = self.img.convert('L')
+        return ImageResult(img)
+
+    def bi_level(self, a: int, b: int):
+        lut = lambda x: 0 if a <= x < b else 255
+        img = self.img.point(lut, mode='1')
+        return ImageResult(img)
+
+    def scale(self, ratio: Real):
         w, h = self.img.size
         img = self.img.resize((floor(w * ratio), floor(h * ratio)), resample=Image.ANTIALIAS)
         return ImageResult(img)
 
-    def mask_rect(self, x: Tuple[float, float], y: Tuple[float, float]):
-        back = Image.new(self.img.mode, self.img.size)
-        mask = Image.new('L', self.img.size, 0)
-        draw = ImageDraw.Draw(mask)
+    def ocr(self, psm: int = 4, oem: int = 1):
+        config = '--psm {} --oem {}'.format(psm, oem)
+        results = pytesseract.image_to_data(self.img, config=config, output_type=Output.DICT)
+        return TesseractOcrResult(self, results)
 
-        # if the coordinate is relative, convert to absolute
-        if all(map(lambda z: z <= 1, (*x, *y))):
-            img_w, img_h = self.img.size
-            x = (floor(x[0] * img_w), floor(x[1] * img_h))
-            y = (floor(y[0] * img_w), floor(y[1] * img_h))
-        draw.rectangle((x, y), fill=255)
-        return ImageResult(Image.composite(self.img, back, mask))
+    def mask(self, op):
+        area = op.area
+        if isinstance(area, RectResult):
+            back = Image.new(self.img.mode, self.img.size)
+            mask = Image.new('L', self.img.size, 0)
+            draw = ImageDraw.Draw(mask)
+            left_top = (area.x, area.y)
+            right_button = (area.x + area.w, area.y + area.h)
+            # if the coordinate is relative, convert to absolute
+            if all(map(lambda z: z <= 1, (*left_top, *right_button))):
+                img_w, img_h = self.img.size
+                left_top = (floor(left_top[0] * img_w), floor(left_top[1] * img_h))
+                right_button = (floor(right_button[0] * img_w), floor(right_button[1] * img_h))
+            draw.rectangle((left_top, right_button), fill=255)
+            return ImageResult(Image.composite(self.img, back, mask))
+        raise ValueError('area must be type one of RectResult')
 
-    def to_data(self):
+    def to_data(self, with_content=True):
         w, h = self.img.size
         data = {
             'size': {
@@ -88,46 +133,15 @@ class ImageResult(Result):
                 'height': h,
             },
             'type': 'image/png;base64',
-            'content': self.to_base64(),
         }
+        if with_content:
+            data['content'] = self.to_base64(),
         return data
 
 
 TesseractItem = namedtuple('TesseractItem', [
     'level', 'page_num', 'block_num', 'par_num', 'line_num', 'word_num',
     'text', 'left', 'top', 'width', 'height', 'conf'])
-
-
-class RectResult(Result):
-
-    def __init__(self, x, y, w, h):
-        self._x = x
-        self._y = y
-        self._w = w
-        self._h = h
-
-    @property
-    def pos(self):
-        return self._x + self._w / 2, self._y + self._h / 2
-
-    def debug(self):
-        img = ImageGrab.grab().resize(get_screen_size())
-        draw = ImageDraw.Draw(img)
-        draw.rectangle(((self._x, self._y), (self._x + self._w, self._y + self._h)), outline='green', width=4)
-        print((self._x, self._y, self._w, self._h))
-        img.show()
-
-    def scale(self, ratio: Number):
-        return RectResult(self._x * ratio, self._y * ratio, self._w * ratio, self._h * ratio)
-
-    def to_data(self):
-        data = {
-            'x': self._x,
-            'y': self._y,
-            'w': self._w,
-            'h': self._h,
-        }
-        return data
 
 
 class TesseractOcrResult(Result):
@@ -178,7 +192,7 @@ class TesseractOcrResult(Result):
             print("conf: {}".format(item.conf))
         img.show()
 
-    def find_location_by_text(self, text: str):
+    def find(self, text: str):
         level_num = self.get_level('word')
         for item in self.iter_results():
             if level_num != item.level or item.conf < 0:
@@ -190,8 +204,17 @@ class TesseractOcrResult(Result):
         return self._results
 
 
-class BaseConfig:
-    pass
+class PositionResult(Result):
+
+    def __init__(self, x: Real, y: Real):
+        self.x = x
+        self.y = y
+
+    def offset(self, w: Real, h: Real):
+        return PositionResult(self.x + w, self.x + h)
+
+    def move_to(self, smooth=True):
+        mouse_move(self.x, self.y, smooth)
 
 
 class CommonCmd:
@@ -248,23 +271,19 @@ class CommonCmd:
         return self
 
     def to_base64(self):
-        result = self._pop()
-        if has_implement_protocol(result, 'to_base64'):
-            return self._push(result.to_base64())
+        op = self._pop()
+        if has_implement_protocol(op, 'to_base64'):
+            return self._push(op.to_base64())
+
+    def move_to(self, *args, **kwargs):
+        op = self._peek()
+        if has_implement_protocol(op, 'move_to'):
+            op.move_to(*args, **kwargs)
+            return self
 
     def click(self, button='left', count=1):
-        result = self._peek()
-        if isinstance(result, RectResult):
-            # move to
-            mouse_move(*result.pos, True)
-        mouse.click(get_pynput_mouse_button(button), count)
+        mouse_click(button, count)
         return self
-
-    def move_to(self):
-        result = self._peek()
-        if isinstance(result, RectResult):
-            mouse_move(*result.pos, True)
-            return self
 
     def open_browser(self, *args, **kwargs):
         webbrowser.open(*args, **kwargs)
@@ -275,49 +294,38 @@ class CommonCmd:
         return self._push(ImageResult(img))
 
     def grayscale(self):
-        result = self._pop()
-        if isinstance(result, ImageResult):
-            img = result.img.convert('L')
-            return self._push(ImageResult(img))
+        op = self._pop()
+        if has_implement_protocol(op, 'grayscale'):
+            return self._push(op.grayscale)
 
-    def bi_level(self, range: Tuple[int, int]):
-        result = self._pop()
-        if isinstance(result, ImageResult):
-            a, b = range
-            lut = lambda x: 0 if a <= x < b else 255
-            img = result.img.point(lut, mode='1')
-            return self._push(ImageResult(img))
+    def bi_level(self, *args, **kwargs):
+        op = self._pop()
+        if has_implement_protocol(op, 'bi_level'):
+            return self._push(op.bi_level(*args, **kwargs))
 
-    def mask_rect(self, x: Tuple[float, float], y: Tuple[float, float]):
-        result = self._pop()
-        if isinstance(result, ImageResult):
-            return self._push(result.mask_rect(x, y))
+    def scale(self, *args, **kwargs):
+        op = self._pop()
+        if has_implement_protocol(op, 'scale'):
+            return self._push(op.scale(*args, **kwargs))
 
-    def scale(self, ratio: int):
-        result = self._pop()
-        if isinstance(result, ImageResult):
-            return self._push(result.scale(ratio))
-        if isinstance(result, RectResult):
-            return self._push(result.scale(ratio))
+    def mask(self, *args, **kwargs):
+        op2 = self._pop()
+        op1 = self._pop()
+        if has_implement_protocol(op1, 'mask'):
+            return self._push(op1.mask(op2, *args, **kwargs))
 
     def nullify_display_scale(self):
         return self.scale(1 / get_screen_scale_ratio())
 
-    def ocr(self, psm: int = 4, oem: int = 1):
-        result = self._pop()
-        if isinstance(result, ImageResult):
-            config = '--psm {} --oem {}'.format(psm, oem)
-            results = pytesseract.image_to_data(result.img, config=config, output_type=Output.DICT)
-            return self._push(TesseractOcrResult(result, results))
+    def ocr(self, *args, **kwargs):
+        op = self._pop()
+        if has_implement_protocol(op, 'ocr'):
+            return self._push(op.ocr(*args, **kwargs))
 
-    def find_location(self, text: str):
-        result = self._pop()
-        if isinstance(result, TesseractOcrResult):
-            loc = result.find_location_by_text(text)
-            return self._push(loc)
-
-    def play_to_camera(self, url: str, timeout=10.0):
-        pass
+    def find(self, *args, **kwargs):
+        op = self._pop()
+        if has_implement_protocol(op, 'find'):
+            return self._push(op.find(*args, **kwargs))
 
 
 def send_video_to_virtual_camera(timeout = 10):
@@ -347,6 +355,10 @@ def mouse_move(x, y, smooth=True):
         mouse.position = (intermediate_x, intermediate_y)
         if smooth:
             time.sleep(.01)
+
+
+def mouse_click(button='left', count=1):
+    mouse.click(get_pynput_mouse_button(button), count)
 
 
 def has_implement_protocol(obj, proto: str):
