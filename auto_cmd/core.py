@@ -41,12 +41,12 @@ class AutoCmdError(Exception):
             data['data'] = self.data
 
 
-class Result:
+class Operand:
     def to_data(self):
         return str(self)
 
 
-class RectangleResult(Result):
+class RectangleOperand(Operand):
     def __init__(self, x, y, w, h):
         self.x = x
         self.y = y
@@ -55,7 +55,7 @@ class RectangleResult(Result):
 
     @property
     def position(self):
-        return PositionResult(self.x + self.w / 2, self.y + self.h / 2)
+        return PositionOperand(self.x + self.w / 2, self.y + self.h / 2)
 
     def move_to(self, *args, **kwargs):
         return self.position.move_to(*args, **kwargs)
@@ -64,7 +64,7 @@ class RectangleResult(Result):
         print(self.to_data())
 
     def scale(self, ratio: Real):
-        return RectangleResult(self.x * ratio, self.y * ratio, self.w * ratio, self.h * ratio)
+        return RectangleOperand(self.x * ratio, self.y * ratio, self.w * ratio, self.h * ratio)
 
     def to_data(self):
         data = {
@@ -76,7 +76,7 @@ class RectangleResult(Result):
         return data
 
 
-class ImageResult(Result):
+class ImageOperand(Operand):
     def __init__(self, img: Image):
         self.img = img
 
@@ -91,26 +91,26 @@ class ImageResult(Result):
 
     def grayscale(self):
         img = self.img.convert('L')
-        return ImageResult(img)
+        return ImageOperand(img)
 
     def bi_level(self, a: int, b: int):
         lut = lambda x: 0 if a <= x < b else 255
         img = self.img.point(lut, mode='1')
-        return ImageResult(img)
+        return ImageOperand(img)
 
     def scale(self, ratio: Real):
         w, h = self.img.size
         img = self.img.resize((floor(w * ratio), floor(h * ratio)), resample=Image.ANTIALIAS)
-        return ImageResult(img)
+        return ImageOperand(img)
 
     def ocr(self, psm: int = 4, oem: int = 1):
         config = '--psm {} --oem {}'.format(psm, oem)
         results = pytesseract.image_to_data(self.img, config=config, output_type=Output.DICT)
-        return TesseractOcrResult(self, results)
+        return TesseractOcrOperand(self, results)
 
     def mask(self, op):
         area = op.area
-        if isinstance(area, RectangleResult):
+        if isinstance(area, RectangleOperand):
             back = Image.new(self.img.mode, self.img.size)
             mask = Image.new('L', self.img.size, 0)
             draw = ImageDraw.Draw(mask)
@@ -122,7 +122,7 @@ class ImageResult(Result):
                 left_top = (floor(left_top[0] * img_w), floor(left_top[1] * img_h))
                 right_button = (floor(right_button[0] * img_w), floor(right_button[1] * img_h))
             draw.rectangle((left_top, right_button), fill=255)
-            return ImageResult(Image.composite(self.img, back, mask))
+            return ImageOperand(Image.composite(self.img, back, mask))
         raise ValueError('area must be type one of RectResult')
 
     def to_data(self, with_content=True):
@@ -144,7 +144,7 @@ TesseractItem = namedtuple('TesseractItem', [
     'text', 'left', 'top', 'width', 'height', 'conf'])
 
 
-class TesseractOcrResult(Result):
+class TesseractOcrOperand(Operand):
 
     @staticmethod
     def get_level(name: str):
@@ -157,7 +157,7 @@ class TesseractOcrResult(Result):
             'word': 5,
         }[name]
 
-    def __init__(self, img_result: ImageResult, results):
+    def __init__(self, img_result: ImageOperand, results):
         self._img_result = img_result
         self._results = results
 
@@ -198,20 +198,20 @@ class TesseractOcrResult(Result):
             if level_num != item.level or item.conf < 0:
                 continue
             if item.text == text:
-                return RectangleResult(item.left, item.top, item.width, item.height)
+                return RectangleOperand(item.left, item.top, item.width, item.height)
 
     def to_data(self):
         return self._results
 
 
-class PositionResult(Result):
+class PositionOperand(Operand):
 
     def __init__(self, x: Real, y: Real):
         self.x = x
         self.y = y
 
     def offset(self, w: Real, h: Real):
-        return PositionResult(self.x + w, self.x + h)
+        return PositionOperand(self.x + w, self.x + h)
 
     def move_to(self, smooth=True):
         mouse_move(self.x, self.y, smooth)
@@ -238,7 +238,7 @@ class CommonCmd:
     def __str__(self):
         if self.is_quiet:
             return str(self._peek())
-        return json.dumps(self.to_data())
+        return json.dumps(self.to_data(), default=lambda o: str(type(o)))
 
     def _push(self, result):
         self._stack.append(result)
@@ -291,7 +291,7 @@ class CommonCmd:
 
     def take_screenshot(self, from_clipboard=False):
         img = ImageGrab.grabclipboard() if from_clipboard else ImageGrab.grab()
-        return self._push(ImageResult(img))
+        return self._push(ImageOperand(img))
 
     def grayscale(self):
         op = self._pop()

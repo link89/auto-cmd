@@ -4,7 +4,6 @@ import sys
 
 from setuptools import find_packages, setup
 
-
 description = 'Cross-platform CLI tools and HTTP RPC server for desktop automation.'
 
 install_requirements = [
@@ -27,7 +26,12 @@ if sys.platform == 'darwin':
         "pyobjc-framework-ApplicationServices==7.3",
         "pyobjc-framework-Cocoa==7.3",
         "pyobjc-framework-CoreText==7.3",
-        "pyobjc-framework-Quartz==7.3"
+        "pyobjc-framework-Quartz==7.3",
+    ])
+
+if sys.platform.startswith('win'):
+    install_requirements.extend([
+        "pywinauto",
     ])
 
 setup(

@@ -1,10 +1,10 @@
-from .core import CommonCmd, Result, RectangleResult, has_implement_protocol
+from .core import CommonCmd, Operand, RectangleOperand, has_implement_protocol
 from typing import List
 import atomac
 from atomac import NativeUIElement
 
 
-class MacUiElementResult(Result):
+class MacUiElementOperand(Operand):
     def __init__(self, el: NativeUIElement):
         self.element = el
 
@@ -20,7 +20,7 @@ class MacUiElementResult(Result):
     def area(self):
         x, y = getattr(self.element, 'AXPosition')
         w, h = self.size
-        return RectangleResult(x, y, w, h)
+        return RectangleOperand(x, y, w, h)
 
     def move_to(self, *args, **kwargs):
         return self.position.move_to(*args, **kwargs)
@@ -31,21 +31,23 @@ class MacUiElementResult(Result):
     def to_data(self):
         data = dict()
         for key in self.element.getAttributes():
-            if key not in {'AXParent', 'AXTopLevelUIElement', 'AXWindow', 'AXFrame',
-                           'AXServesAsTitleForUIElements', 'AXChildren'}:
-                try:
-                    data[key] = getattr(self.element, key)
-                except Exception as e:
-                    pass
+            try:
+                data[key] = getattr(self.element, key)
+            except Exception as e:
+                pass
         return data
 
 
-class MacUiElementsResult(Result):
+class MacUiElementsOperand(Operand):
     def __init__(self, els: List[NativeUIElement]):
         self._elements = els
 
+    @property
+    def elements(self):
+        return tuple(map(lambda o: MacUiElementOperand(o), self._elements))
+
     def to_data(self):
-        pass
+        return tuple(map(lambda o: o.to_data, self.elements))
 
     def debug(self):
         print(self._elements)
@@ -62,28 +64,28 @@ class MacAutoCmd(CommonCmd):
             app = atomac.getAppRefByBundleId(bundle_id)
         else:
             app = atomac.getFrontmostApp()
-        return self._push(MacUiElementResult(app))
+        return self._push(MacUiElementOperand(app))
 
     def query_element(self, recursive=False, **kwargs):
         result = self._pop()
-        if isinstance(result, MacUiElementResult):
+        if isinstance(result, MacUiElementOperand):
             if recursive:
                 element = result.element.findFirstR(**kwargs)
             else:
                 element = result.element.findFirst(**kwargs)
-            return self._push(MacUiElementResult(element))
+            return self._push(MacUiElementOperand(element))
 
     def query_elements(self, recursive=False, **kwargs):
         result = self._pop()
-        if isinstance(result, MacUiElementResult):
+        if isinstance(result, MacUiElementOperand):
             if recursive:
                 elements = result.element.findAllR(**kwargs)
             else:
                 elements = result.element.findAll(**kwargs)
-            return self._push(MacUiElementsResult(elements))
+            return self._push(MacUiElementsOperand(elements))
 
-    def activate(self):
+    def activate(self, *args, **kwargs):
         result = self._peek()
         if has_implement_protocol(result, 'activate'):
-            result.activate()
+            result.activate(*args, **kwargs)
             return self
