@@ -1,4 +1,4 @@
-from .core import CommonCmd, Result, RectangleResult
+from .core import CommonCmd, Result, RectangleResult, has_implement_protocol
 from typing import List
 import atomac
 from atomac import NativeUIElement
@@ -24,6 +24,9 @@ class MacUiElementResult(Result):
 
     def move_to(self, *args, **kwargs):
         return self.position.move_to(*args, **kwargs)
+
+    def activate(self):
+        return self.element.activate()
 
     def to_data(self):
         data = dict()
@@ -78,3 +81,9 @@ class MacAutoCmd(CommonCmd):
             else:
                 elements = result.element.findAll(**kwargs)
             return self._push(MacUiElementsResult(elements))
+
+    def activate(self):
+        result = self._peek()
+        if has_implement_protocol(result, 'activate'):
+            result.activate()
+            return self
