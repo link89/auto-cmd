@@ -17,6 +17,7 @@ install_requirements = [
     'numpy',
     'opencv-python',
     'mss',
+    'pandas',
 ]
 
 if sys.platform == 'darwin':
@@ -27,6 +28,7 @@ if sys.platform == 'darwin':
         "pyobjc-framework-Cocoa==7.3",
         "pyobjc-framework-CoreText==7.3",
         "pyobjc-framework-Quartz==7.3",
+        'atomac @ https://github.com/pyatom/pyatom/archive/master.zip',
     ])
 
 if sys.platform.startswith('win'):

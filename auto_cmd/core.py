@@ -8,13 +8,14 @@ import pytesseract
 from pytesseract import Output
 import base64
 from io import BytesIO
-from collections import namedtuple
 from pynput.mouse import Button, Controller
 import pyvirtualcam
 import numpy as np
+import pandas as pd
 import webbrowser
 import json
 import sys
+import re
 from math import floor
 
 from .utils import get_stacktrace_from_exception
@@ -56,6 +57,9 @@ class RectangleOperand(Operand):
     @property
     def position(self):
         return PositionOperand(self.x + self.w / 2, self.y + self.h / 2)
+
+    def offset(self, w: Real, h: Real):
+        return RectangleOperand(self.x + w, self.y + h, self.w, self.h)
 
     def move_to(self, *args, **kwargs):
         return self.position.move_to(*args, **kwargs)
@@ -105,8 +109,8 @@ class ImageOperand(Operand):
 
     def ocr(self, psm: int = 4, oem: int = 1):
         config = '--psm {} --oem {}'.format(psm, oem)
-        ocr_data = pytesseract.image_to_data(self.img, config=config, output_type=Output.DICT)
-        return TesseractOcrOperand(self, ocr_data)
+        ocr_df = pytesseract.image_to_data(self.img, config=config, output_type=Output.DATAFRAME)
+        return TesseractOcrOperand(self, ocr_df)
 
     def mask(self, op):
         area = op.area
@@ -139,11 +143,6 @@ class ImageOperand(Operand):
         return data
 
 
-TesseractItem = namedtuple('TesseractItem', [
-    'level', 'page_num', 'block_num', 'par_num', 'line_num', 'word_num',
-    'text', 'left', 'top', 'width', 'height', 'conf'])
-
-
 class TesseractOcrOperand(Operand):
 
     @staticmethod
@@ -157,48 +156,34 @@ class TesseractOcrOperand(Operand):
             'word': 5,
         }[name]
 
-    def __init__(self, img_op: ImageOperand, ocr_data):
+    def __init__(self, img_op: ImageOperand, df: pd.DataFrame):
         self._img_op = img_op
-        self._ocr_data = []
-        for i, _ in enumerate(ocr_data["text"]):
-            self._ocr_data.append(TesseractItem(
-                level=ocr_data["level"][i],
-                page_num=ocr_data["page_num"][i],
-                block_num=ocr_data["block_num"][i],
-                par_num=ocr_data["par_num"][i],
-                line_num=ocr_data["line_num"][i],
-                word_num=ocr_data["word_num"][i],
-                text=ocr_data["text"][i],
-                top=ocr_data["top"][i],
-                left=ocr_data["left"][i],
-                width=ocr_data["width"][i],
-                height=ocr_data["height"][i],
-                conf=ocr_data["conf"][i],
-            ))
+        self._df = df
 
     def debug(self, level='word'):
-        level_num = self.get_level_code(level)
+        level_code = self.get_level_code(level)
         img = self._img_op.img.convert("RGBA")
         draw = ImageDraw.Draw(img)
 
-        for item in filter(lambda o: o.level == level_num, self._ocr_data):
-            draw.rectangle(((item.left, item.top), (item.left+item.width, item.top+item.height)), outline='green', width=4)
-            print("=" * 30)
-            print("text: {}".format(item.text))
-            print("location: x, y: {}, {}, w, h: {}, {}".format(item.left, item.top, item.width, item.height))
-            print("conf: {}".format(item.conf))
+        for row in self._df.itertuples(name='Tesseract'):
+            if row.level != level_code:
+                continue
+            draw.rectangle(((row.left, row.top), (row.left+row.width, row.top+row.height)), outline='green', width=4)
         img.show()
 
     def find(self, text: str, level='word'):
-        level_num = self.get_level_code(level)
-        for item in self._ocr_data:
-            if level_num != item.level or item.conf < 0:
-                continue
-            if item.text == text:
-                return RectangleOperand(item.left, item.top, item.width, item.height)
+        if 'word' == level:
+            return self._find_word(text)
+
+    def _find_word(self, text: str):
+        word_level = self.get_level_code('word')
+        pattern = re.compile(text)
+        for row in self._df.itertuples(name='Tesseract'):
+            if row.level == word_level and isinstance(row.text, str) and pattern.match(row.text):
+                return RectangleOperand(row.left, row.top, row.width, row.height)
 
     def to_data(self):
-        return self._ocr_data
+        return self._df.to_dict()
 
 
 class PositionOperand(Operand):
@@ -208,7 +193,7 @@ class PositionOperand(Operand):
         self.y = y
 
     def offset(self, w: Real, h: Real):
-        return PositionOperand(self.x + w, self.x + h)
+        return PositionOperand(self.x + w, self.y + h)
 
     def move_to(self, smooth=True):
         mouse_move(self.x, self.y, smooth)
@@ -271,6 +256,11 @@ class CommonCmd:
         op = self._pop()
         if has_implement_protocol(op, 'to_base64'):
             return self._push(op.to_base64())
+
+    def offset(self, *args, **kwargs):
+        op = self._pop()
+        if has_implement_protocol(op, 'offset'):
+            return self._push(op.offset(*args, **kwargs))
 
     def move_to(self, *args, **kwargs):
         op = self._peek()
