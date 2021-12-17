@@ -93,18 +93,18 @@ class ImageOperand(Operand):
         return base64.b64encode(buffered.getvalue()).decode('ascii')
 
     def grayscale(self):
-        img = self.img.convert('L')
-        return ImageOperand(img)
+        self.img = self.img.convert('L')
+        return self
 
     def bi_level(self, a: int, b: int):
         lut = lambda x: 0 if a <= x < b else 255
-        img = self.img.point(lut, mode='1')
-        return ImageOperand(img)
+        self.img = self.img.point(lut, mode='1')
+        return self
 
     def scale(self, ratio: Real):
         w, h = self.img.size
-        img = self.img.resize((floor(w * ratio), floor(h * ratio)), resample=Image.ANTIALIAS)
-        return ImageOperand(img)
+        self.img = self.img.resize((floor(w * ratio), floor(h * ratio)), resample=Image.ANTIALIAS)
+        return self
 
     def ocr(self, psm: int = 4, oem: int = 1):
         config = '--psm {} --oem {}'.format(psm, oem)
@@ -125,7 +125,8 @@ class ImageOperand(Operand):
                 left_top = (floor(left_top[0] * img_w), floor(left_top[1] * img_h))
                 right_button = (floor(right_button[0] * img_w), floor(right_button[1] * img_h))
             draw.rectangle((left_top, right_button), fill=255)
-            return ImageOperand(Image.composite(self.img, back, mask))
+            self.img = Image.composite(self.img, back, mask)
+            return self
         raise ValueError('area must be type one of RectOprand')
 
     def to_data(self, with_content=True):
@@ -203,17 +204,19 @@ class TesseractOcrOperand(Operand):
             draw.rectangle(((row.left, row.top), (row.left+row.width, row.top+row.height)), outline='green', width=4)
         img.show()
 
-    def find(self, text: str, level='word'):
+    def find(self, text: str, level='word', **kwargs):
         if 'word' == level:
-            return self._find_word(text)
+            return self._find_word(text, **kwargs)
 
-    def _find_word(self, text: str):
+    def _find_word(self, text: str, ignore_case=True):
         word_level = self.get_level_num('word')
-        pattern = re.compile(text)
+        flag = re.IGNORECASE if ignore_case else 0
+        pattern = re.compile(text, flag)
         for row in self._df.itertuples(name='Tesseract'):
             if row.level == word_level and isinstance(row.text, str) and pattern.match(row.text):
                 rect = RectangleOperand(row.left, row.top, row.width, row.height)
                 if isinstance(self._img_op, ScreenshotOperand):
+                    print(self._img_op.offset)
                     rect = rect.scale(self._img_op.scale_ratio).offset(*self._img_op.offset)
                 return rect
 

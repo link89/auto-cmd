@@ -20,15 +20,26 @@ Cross platforms and cross languages desktop automation solution.
 
 ## Get started
 
+### Prepare
+Please ensure you having Python >=3.6 installed.
+For Windows user, you may need to install `Microsoft C++ Build Tool`.
+
+You should ensure Tesseract is installed in your system. Both version 4 and 5 are supported.
+For Windows user this would be a little tedious, you have to add its path to environment variable.
+Run the following command to test if tesseract is installed correctly.
+```shell
+tesseract -v
+```
+
 ### Installation
-Please ensure your Python >=3.6 before you continue.
+
 ```shell
 pip install -U pip  # upgrade pip to avoid unexpected issue
 pip install https://github.com/link89/auto-cmd/archive/refs/heads/main.zip
 ```
 Run the following command to Star this project as a test, thank you.
 ```shell
-auto-cmd open_browser 'https://github.com/link89/auto-cmd' - sleep 5 - take_screenshot - ocr - find Star - move_to - click
+auto-cmd open_browser 'https://github.com/link89/auto-cmd' - sleep 5 - take_screenshot - grayscale - bi_level 0 128 - ocr - find star - move_to - click
 ```
 
 ### Commands
