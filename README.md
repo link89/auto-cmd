@@ -22,6 +22,7 @@ Cross platforms and cross languages desktop automation solution.
 
 ### Prepare
 Please ensure you having Python >=3.6 installed.
+
 For Windows user, you may need to install `Microsoft C++ Build Tool`.
 
 You should ensure Tesseract is installed in your system. Both version 4 and 5 are supported.
