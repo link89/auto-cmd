@@ -144,7 +144,7 @@ class ImageOperand(Operand):
 
 class ScreenshotOperand(ImageOperand):
 
-    bound = None  # dict with key  left, top, width, height
+    bound = None  # dict with keys: left, top, width, height
 
     @classmethod
     def take_screenshot(cls, n=1):
@@ -154,7 +154,6 @@ class ScreenshotOperand(ImageOperand):
             img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
             screenshot = cls(img)
             screenshot.bound = monitor
-
             return screenshot
 
     @property
@@ -163,7 +162,7 @@ class ScreenshotOperand(ImageOperand):
 
     @property
     def offset(self):
-        return (self.bound['left'], self.bound['top'])
+        return self.bound['left'], self.bound['top']
 
 
 class TesseractOcrOperand(Operand):
