@@ -146,7 +146,7 @@ class ImageOperand(Operand):
 class TesseractOcrOperand(Operand):
 
     @staticmethod
-    def get_level_code(name: str):
+    def get_level_num(name: str):
         return {
             'page': 1,
             'block': 2,
@@ -156,17 +156,27 @@ class TesseractOcrOperand(Operand):
             'word': 5,
         }[name]
 
+    @staticmethod
+    def get_level_col(name: str):
+        return {
+            'page': 'page_num',
+            'block': 'block_num',
+            'paragraph': 'par_num',
+            'par': 'par_num',
+            'line': 'line_num',
+            'word': 'word_num',
+        }[name]
+
     def __init__(self, img_op: ImageOperand, df: pd.DataFrame):
         self._img_op = img_op
-        self._df = df
+        self._df = df  # level, page_num, block_num, par_num, line_num, word_num, left, top, width, height, conf, text
 
     def debug(self, level='word'):
-        level_code = self.get_level_code(level)
+        level_num = self.get_level_num(level)
         img = self._img_op.img.convert("RGBA")
         draw = ImageDraw.Draw(img)
-
         for row in self._df.itertuples(name='Tesseract'):
-            if row.level != level_code:
+            if row.level != level_num:
                 continue
             draw.rectangle(((row.left, row.top), (row.left+row.width, row.top+row.height)), outline='green', width=4)
         img.show()
@@ -176,7 +186,7 @@ class TesseractOcrOperand(Operand):
             return self._find_word(text)
 
     def _find_word(self, text: str):
-        word_level = self.get_level_code('word')
+        word_level = self.get_level_num('word')
         pattern = re.compile(text)
         for row in self._df.itertuples(name='Tesseract'):
             if row.level == word_level and isinstance(row.text, str) and pattern.match(row.text):
@@ -247,6 +257,7 @@ class CommonCmd:
             op.debug(*args, **kwargs)
         else:
             print(self.to_data())
+        return self
 
     def sleep(self, sec: int):
         time.sleep(sec)
@@ -283,7 +294,7 @@ class CommonCmd:
     def grayscale(self):
         op = self._pop()
         if has_implement_protocol(op, 'grayscale'):
-            return self._push(op.grayscale)
+            return self._push(op.grayscale())
 
     def bi_level(self, *args, **kwargs):
         op = self._pop()

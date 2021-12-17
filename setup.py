@@ -18,6 +18,8 @@ install_requirements = [
     'opencv-python',
     'mss',
     'pandas',
+    'scikit-learn',
+    'scipy',
 ]
 
 if sys.platform == 'darwin':
