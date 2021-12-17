@@ -25,6 +25,9 @@ class MacUiElementOperand(Operand):
     def move_to(self, *args, **kwargs):
         return self.position.move_to(*args, **kwargs)
 
+    def offset(self, *args, **kwargs):
+        return self.area.offset(*args, **kwargs)
+
     def activate(self):
         return self.element.activate()
 

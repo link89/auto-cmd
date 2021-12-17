@@ -214,7 +214,7 @@ class TesseractOcrOperand(Operand):
             if row.level == word_level and isinstance(row.text, str) and pattern.match(row.text):
                 rect = RectangleOperand(row.left, row.top, row.width, row.height)
                 if isinstance(self._img_op, ScreenshotOperand):
-                    rect = rect.offset(*self._img_op.offset).scale(self._img_op.scale_ratio)
+                    rect = rect.scale(self._img_op.scale_ratio).offset(*self._img_op.offset)
                 return rect
 
     def to_data(self):
