@@ -45,5 +45,9 @@ It may take several seconds to finish, don't touch your mouse and keyboard befor
 auto-cmd open_browser 'https://github.com/link89/auto-cmd' - sleep 5 - take_screenshot - grayscale - bi_level 0 128 - ocr - find star - move_to - click
 ```
 
-### Commands
+## Commands
+TBD
+
+
+## Developers Guide
 TBD
