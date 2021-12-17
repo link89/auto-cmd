@@ -38,7 +38,9 @@ tesseract -v
 pip install -U pip  # upgrade pip to avoid unexpected issue
 pip install https://github.com/link89/auto-cmd/archive/refs/heads/main.zip
 ```
-Run the following command to Star this project as a test, thank you.
+Run the following command to test if everything is OK.
+It may take several seconds to finish, don't touch your mouse and keyboard before it finish.
+
 ```shell
 auto-cmd open_browser 'https://github.com/link89/auto-cmd' - sleep 5 - take_screenshot - grayscale - bi_level 0 128 - ocr - find star - move_to - click
 ```
