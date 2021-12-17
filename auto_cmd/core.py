@@ -17,6 +17,7 @@ import json
 import sys
 import re
 from math import floor
+import mss
 
 from .utils import get_stacktrace_from_exception
 
@@ -81,6 +82,7 @@ class RectangleOperand(Operand):
 
 
 class ImageOperand(Operand):
+
     def __init__(self, img: Image):
         self.img = img
 
@@ -142,6 +144,20 @@ class ImageOperand(Operand):
             data['content'] = self.to_base64(),
         return data
 
+
+class ScreenshotOperand(ImageOperand):
+
+    bound = None  # dict with key  left, top, width, height
+
+    @classmethod
+    def take_screenshot(cls, n=1):
+        with mss.mss() as sct:
+            monitor = sct.monitors[n]
+            screenshot = sct.grab(monitor)
+            img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
+            screenshot = cls(img)
+            screenshot.bound = monitor
+            return screenshot
 
 class TesseractOcrOperand(Operand):
 
@@ -287,9 +303,8 @@ class CommonCmd:
         webbrowser.open(*args, **kwargs)
         return self
 
-    def take_screenshot(self, from_clipboard=False):
-        img = ImageGrab.grabclipboard() if from_clipboard else ImageGrab.grab()
-        return self._push(ImageOperand(img))
+    def take_screenshot(self, n=1):
+        return self._push(ScreenshotOperand.take_screenshot(n))
 
     def grayscale(self):
         op = self._pop()

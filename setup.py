@@ -15,7 +15,6 @@ install_requirements = [
     'Pillow',
     'pyvirtualcam',
     'numpy',
-    'opencv-python',
     'mss',
     'pandas',
     'scikit-learn',
