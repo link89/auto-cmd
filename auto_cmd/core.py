@@ -213,7 +213,7 @@ class TesseractOcrOperand(Operand):
         flag = re.IGNORECASE if ignore_case else 0
         pattern = re.compile(text, flag)
         for row in self._df.itertuples(name='Tesseract'):
-            if row.level == word_level and isinstance(row.text, str) and pattern.match(row.text):
+            if row.level == word_level and isinstance(row.text, str) and pattern.fullmatch(row.text):
                 rect = RectangleOperand(row.left, row.top, row.width, row.height)
                 if isinstance(self._img_op, ScreenshotOperand):
                     print(self._img_op.offset)
