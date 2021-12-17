@@ -1,8 +1,6 @@
 from numbers import Real
 import time
-from functools import lru_cache
-import tkinter as tk
-from PIL import ImageGrab, Image, ImageDraw
+from PIL import Image, ImageDraw
 from pprint import pprint as print
 import pytesseract
 from pytesseract import Output
@@ -87,7 +85,6 @@ class ImageOperand(Operand):
         self.img = img
 
     def debug(self):
-        print(self.to_data(False))
         self.img.show()
 
     def to_base64(self):
@@ -157,7 +154,17 @@ class ScreenshotOperand(ImageOperand):
             img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
             screenshot = cls(img)
             screenshot.bound = monitor
+
             return screenshot
+
+    @property
+    def scale_ratio(self):
+        return self.bound['width'] / self.img.size[0]
+
+    @property
+    def offset(self):
+        return (self.bound['left'], self.bound['top'])
+
 
 class TesseractOcrOperand(Operand):
 
@@ -206,7 +213,10 @@ class TesseractOcrOperand(Operand):
         pattern = re.compile(text)
         for row in self._df.itertuples(name='Tesseract'):
             if row.level == word_level and isinstance(row.text, str) and pattern.match(row.text):
-                return RectangleOperand(row.left, row.top, row.width, row.height)
+                rect = RectangleOperand(row.left, row.top, row.width, row.height)
+                if isinstance(self._img_op, ScreenshotOperand):
+                    rect = rect.offset(*self._img_op.offset).scale(self._img_op.scale_ratio)
+                return rect
 
     def to_data(self):
         return self._df.to_dict()
@@ -327,9 +337,6 @@ class CommonCmd:
         if has_implement_protocol(op1, 'mask'):
             return self._push(op1.mask(op2, *args, **kwargs))
 
-    def nullify_display_scale(self):
-        return self.scale(1 / get_screen_scale_ratio())
-
     def ocr(self, *args, **kwargs):
         op = self._pop()
         if has_implement_protocol(op, 'ocr'):
@@ -376,23 +383,3 @@ def mouse_click(button='left', count=1):
 
 def has_implement_protocol(obj, proto: str):
     return hasattr(obj, proto) and callable(getattr(obj, proto))
-
-
-@lru_cache(maxsize=None)
-def get_screen_size():
-    root = tk.Tk()
-    size = root.winfo_screenwidth(), root.winfo_screenheight()
-    root.destroy()
-    return size
-
-
-@lru_cache(maxsize=None)
-def get_resolution():
-    return ImageGrab.grab().size
-
-
-@lru_cache(maxsize=None)
-def get_screen_scale_ratio():
-    resolution = get_resolution()
-    screen_size = get_screen_size()
-    return resolution[0] / screen_size[0]
