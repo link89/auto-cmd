@@ -14,7 +14,7 @@ class MacUiElementOperand(Operand):
         fifo = [(1, self.element)]  # item is tuple of depth, element
 
         while fifo:
-            depth, element = fifo.pop()
+            depth, element = fifo.pop(0)
             if depth > max_depth:
                 break
 
