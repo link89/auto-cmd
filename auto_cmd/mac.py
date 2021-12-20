@@ -8,6 +8,31 @@ class MacUiElementOperand(Operand):
     def __init__(self, el: NativeUIElement):
         self.element = el
 
+    def query_element(self, max_depth=0, **kwargs):
+        max_depth = max_depth if max_depth > 0 else 255
+
+        fifo = [(1, self.element)]  # item is tuple of depth, element
+
+        while fifo:
+            depth, element = fifo.pop()
+            if depth > max_depth:
+                break
+
+            ret = None
+            try:
+                ret = element.findFirst(**kwargs)
+            except Exception as e:
+                pass
+            if ret is not None:
+                return MacUiElementOperand(ret)
+
+            try:
+                children = element.AXChildren
+                for child in children:
+                    fifo.append((depth + 1, child))
+            except Exception as e:
+                pass
+
     @property
     def size(self):
         return tuple(getattr(self.element, 'AXSize'))
@@ -69,14 +94,10 @@ class MacAutoCmd(CommonCmd):
             app = atomac.getFrontmostApp()
         return self._push(MacUiElementOperand(app))
 
-    def query_element(self, recursive=False, **kwargs):
+    def query_element(self, **kwargs):
         result = self._pop()
         if isinstance(result, MacUiElementOperand):
-            if recursive:
-                element = result.element.findFirstR(**kwargs)
-            else:
-                element = result.element.findFirst(**kwargs)
-            return self._push(MacUiElementOperand(element))
+            return self._push(result.query_element(**kwargs))
 
     def query_elements(self, recursive=False, **kwargs):
         result = self._pop()
