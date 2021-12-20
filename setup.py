@@ -42,7 +42,7 @@ setup(
     name='auto-cmd',
     author='link89',
     author_email='xuweihong.cn@gmail.com',
-    version='0.0.6',
+    version='0.0.7',
     packages=find_packages(),
     description=description,
     long_description=description,
