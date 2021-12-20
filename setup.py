@@ -19,6 +19,7 @@ install_requirements = [
     'pandas',
     'scikit-learn',
     'scipy',
+    'psutil',
 ]
 
 if sys.platform == 'darwin':

@@ -6,7 +6,6 @@ import pytesseract
 from pytesseract import Output
 import base64
 from io import BytesIO
-from pynput.mouse import Button, Controller
 import pyvirtualcam
 import numpy as np
 import pandas as pd
@@ -17,10 +16,7 @@ import re
 from math import floor
 import mss
 
-from .utils import get_stacktrace_from_exception
-
-# Singletons
-mouse = Controller()
+from .utils import get_stacktrace_from_exception, mouse_click, mouse_move
 
 
 class AutoCmdError(Exception):
@@ -273,8 +269,23 @@ class CommonCmd:
     def health_check(self):
         return 'OK'
 
+    def echo(self, text):
+        return text
+
     def get_platform(self):
         return sys.platform
+
+    def send_keys(self, keys: list):
+        pass
+
+    def tap_key(self, key: str):
+        pass
+
+    def press_key(self, key: str):
+        pass
+
+    def release_key(self, key: str):
+        pass
 
     def push_none(self):
         return self._push(None)
@@ -362,26 +373,6 @@ def send_video_to_virtual_camera(timeout = 10):
             cam.sleep_until_next_frame()
 
 
-def get_pynput_mouse_button(button: str):
-    return {
-        'left': Button.left,
-        'right': Button.right,
-    }[button]
-
-
-def mouse_move(x, y, smooth=True):
-    old_x, old_y = mouse.position
-    for i in range(100):
-        intermediate_x = old_x + (x - old_x) * (i + 1) / 100.0
-        intermediate_y = old_y + (y - old_y) * (i + 1) / 100.0
-        mouse.position = (intermediate_x, intermediate_y)
-        if smooth:
-            time.sleep(.01)
-
-
-def mouse_click(button='left', count=1):
-    mouse.click(get_pynput_mouse_button(button), count)
-
-
 def has_implement_protocol(obj, proto: str):
     return hasattr(obj, proto) and callable(getattr(obj, proto))
+

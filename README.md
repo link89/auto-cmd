@@ -17,6 +17,8 @@ Cross platforms and cross languages desktop automation solution.
 
 ### Features
 * Locate UI element via system interface, OCR and image matching.
+* Image process.
+
 
 ## Get started
 
