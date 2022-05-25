@@ -20,6 +20,7 @@ install_requirements = [
     'scikit-learn',
     'scipy',
     'psutil',
+    'guibot',
 ]
 
 if sys.platform == 'darwin':

@@ -8,30 +8,41 @@ class MacUiElementOperand(Operand):
     def __init__(self, el: NativeUIElement):
         self.element = el
 
-    def query_element(self, max_depth=0, **kwargs):
-        max_depth = max_depth if max_depth > 0 else 255
-
+    def _order_iter_elements(self, max_depth=0):
+        max_depth = max_depth if max_depth > 0 else 255  # limit max_depth to 255 to ensure return
         fifo = [(1, self.element)]  # item is tuple of depth, element
-
         while fifo:
             depth, element = fifo.pop(0)
             if depth > max_depth:
                 break
-
-            ret = None
-            try:
-                ret = element.findFirst(**kwargs)
-            except Exception as e:
-                pass
-            if ret is not None:
-                return MacUiElementOperand(ret)
-
+            yield element
             try:
                 children = element.AXChildren
                 for child in children:
                     fifo.append((depth + 1, child))
             except Exception as e:
                 pass
+
+    def query_element(self, max_depth=0, **kwargs):
+        for element in self._order_iter_elements(max_depth):
+            try:
+                found = element.findFirst(**kwargs)
+                if found:
+                    return MacUiElementOperand(found)
+            except Exception as e:
+                pass
+
+    def query_elements(self, max_depth=0, limit=0, **kwargs):
+        all_founds = []
+        for element in self._order_iter_elements(max_depth):
+            try:
+                founds = element.findAll(**kwargs)
+                all_founds.extend(map(MacUiElementOperand, founds))
+                if 0 < limit <= len(all_founds):
+                    return all_founds[0: limit]
+            except Exception as e:
+                pass
+        return all_founds
 
     @property
     def size(self):
@@ -95,18 +106,14 @@ class MacAutoCmd(CommonCmd):
         return self._push(MacUiElementOperand(app))
 
     def query_element(self, **kwargs):
-        result = self._pop()
-        if isinstance(result, MacUiElementOperand):
-            return self._push(result.query_element(**kwargs))
+        op = self._pop()
+        if isinstance(op, MacUiElementOperand):
+            return self._push(op.query_element(**kwargs))
 
-    def query_elements(self, recursive=False, **kwargs):
-        result = self._pop()
-        if isinstance(result, MacUiElementOperand):
-            if recursive:
-                elements = result.element.findAllR(**kwargs)
-            else:
-                elements = result.element.findAll(**kwargs)
-            return self._push(MacUiElementsOperand(elements))
+    def query_elements(self, **kwargs):
+        op = self._pop()
+        if isinstance(op, MacUiElementOperand):
+            return self._push(op.query_elements(**kwargs))
 
     def activate(self, *args, **kwargs):
         result = self._peek()
