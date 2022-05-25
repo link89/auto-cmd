@@ -17,7 +17,7 @@ from collections import namedtuple
 from typing import List, Optional
 
 from .utils import get_stacktrace_from_exception, mouse_click, mouse_move
-from .wire import registered_vms
+from .wire import get_vms
 
 
 class AutoCmdError(Exception):
@@ -40,7 +40,6 @@ class AutoCmdError(Exception):
 
 Instruction = namedtuple('Instruction', ('name', 'pop', 'push'))
 
-
 def instruction(pop=1, push=True):
     def closure(func):
         def wrapper(self: Operand, *args, **kwargs):
@@ -57,7 +56,6 @@ class Operand:
 
     def to_data(self):
         return str(self)
-
 
 class RectangleOperand(Operand):
     def __init__(self, x, y, w, h):
@@ -233,14 +231,15 @@ class PositionOperand(Operand):
 
 
 class BaseVm:
+
     is_quiet = False
-    parent: Optional['BaseVm'] = None
+    parent: Optional['CommonVm'] = None
 
     def __init__(self):
         self._stack = []
 
     def use_vm(self, name: str, *args, **kwargs):
-        vm = registered_vms.get(name)
+        vm = get_vms(name)
         if vm is None:
             raise ValueError('vm {} is not existed.'.format(name))
         vm.parent = self
@@ -276,6 +275,9 @@ class BaseVm:
     def _peek(self):
         return self._stack[-1]
 
+
+class CommonVm(BaseVm):
+
     def health_check(self):
         return 'OK'
 
@@ -289,44 +291,19 @@ class BaseVm:
         pass
 
     def tap_key(self, key: str):
-        pass
+
+        return self
 
     def press_key(self, key: str):
-        pass
+
+        return self
 
     def release_key(self, key: str):
-        pass
-
-    def push_none(self):
-        return self._push(None)
-
-    def debug(self, *args, **kwargs):
-        op = self._peek()
-        if has_implement_protocol(op, 'debug'):
-            op.debug(*args, **kwargs)
-        else:
-            print(self.to_data())
         return self
 
     def sleep(self, sec: int):
         time.sleep(sec)
         return self
-
-    def to_base64(self):
-        op = self._pop()
-        if has_implement_protocol(op, 'to_base64'):
-            return self._push(op.to_base64())
-
-    def offset(self, *args, **kwargs):
-        op = self._pop()
-        if has_implement_protocol(op, 'offset'):
-            return self._push(op.offset(*args, **kwargs))
-
-    def move_to(self, *args, **kwargs):
-        op = self._peek()
-        if has_implement_protocol(op, 'move_to'):
-            op.move_to(*args, **kwargs)
-            return self
 
     def click(self, button='left', count=1):
         mouse_click(button, count)
@@ -339,30 +316,6 @@ class BaseVm:
     def take_screenshot(self, n=1):
         return self._push(ScreenshotOperand.take_screenshot(n))
 
-    def grayscale(self):
-        op = self._pop()
-        if has_implement_protocol(op, 'grayscale'):
-            return self._push(op.grayscale())
-
-    def bi_level(self, *args, **kwargs):
-        op = self._pop()
-        if has_implement_protocol(op, 'bi_level'):
-            return self._push(op.bi_level(*args, **kwargs))
-
-    def scale(self, *args, **kwargs):
-        op = self._pop()
-        if has_implement_protocol(op, 'scale'):
-            return self._push(op.scale(*args, **kwargs))
-
-    def ocr(self, *args, **kwargs):
-        op = self._pop()
-        if has_implement_protocol(op, 'ocr'):
-            return self._push(op.tesseract(*args, **kwargs))
-
-    def find(self, *args, **kwargs):
-        op = self._pop()
-        if has_implement_protocol(op, 'find'):
-            return self._push(op.find(*args, **kwargs))
 
 def has_implement_protocol(obj, proto: str):
     return hasattr(obj, proto) and callable(getattr(obj, proto))

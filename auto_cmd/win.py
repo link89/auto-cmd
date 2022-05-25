@@ -1,5 +1,5 @@
-from .core import BaseVm
+from .core import CommonVm
 
 
-class WinAutoVm(BaseVm):
+class WinAutoVm(CommonVm):
     pass

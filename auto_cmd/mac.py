@@ -1,4 +1,4 @@
-from .core import BaseVm, Operand, RectangleOperand, has_implement_protocol
+from .core import CommonVm, Operand, RectangleOperand, has_implement_protocol
 from typing import List
 import atomac
 from atomac import NativeUIElement
@@ -92,7 +92,7 @@ class MacUiElementsOperand(Operand):
         print(self._elements)
 
 
-class MacAutoVm(BaseVm):
+class MacAutoVm(CommonVm):
 
     def query_app(self, name=None, pid=0, bundle_id=None):
         if name:

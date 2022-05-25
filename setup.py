@@ -21,6 +21,7 @@ install_requirements = [
     'scipy',
     'psutil',
     'guibot',
+    'autopy',
 ]
 
 if sys.platform == 'darwin':
