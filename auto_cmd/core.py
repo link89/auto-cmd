@@ -6,8 +6,6 @@ import pytesseract
 from pytesseract import Output
 import base64
 from io import BytesIO
-import pyvirtualcam
-import numpy as np
 import pandas as pd
 import webbrowser
 import json
@@ -15,8 +13,11 @@ import sys
 import re
 from math import floor
 import mss
+from collections import namedtuple
+from typing import List, Optional
 
 from .utils import get_stacktrace_from_exception, mouse_click, mouse_move
+from .wire import registered_vms
 
 
 class AutoCmdError(Exception):
@@ -37,7 +38,23 @@ class AutoCmdError(Exception):
             data['data'] = self.data
 
 
+Instruction = namedtuple('Instruction', ('name', 'pop', 'push'))
+
+
+def instruction(pop=1, push=True):
+    def closure(func):
+        def wrapper(self: Operand, *args, **kwargs):
+            if self._instructions_ is None:
+                self._instructions_ = []
+            self._instructions_.append(Instruction(func.__name__, pop, push))
+            return func(*args, **kwargs)
+        return wrapper
+    return closure
+
+
 class Operand:
+    _instructions_: List[Instruction] = None
+
     def to_data(self):
         return str(self)
 
@@ -102,28 +119,10 @@ class ImageOperand(Operand):
         self.img = self.img.resize((floor(w * ratio), floor(h * ratio)), resample=Image.ANTIALIAS)
         return self
 
-    def ocr(self, psm: int = 4, oem: int = 1):
+    def tesseract(self, psm: int = 4, oem: int = 1):
         config = '--psm {} --oem {}'.format(psm, oem)
         ocr_df = pytesseract.image_to_data(self.img, config=config, output_type=Output.DATAFRAME)
-        return TesseractOcrOperand(self, ocr_df)
-
-    def mask(self, op):
-        area = op.area
-        if isinstance(area, RectangleOperand):
-            back = Image.new(self.img.mode, self.img.size)
-            mask = Image.new('L', self.img.size, 0)
-            draw = ImageDraw.Draw(mask)
-            left_top = (area.x, area.y)
-            right_button = (area.x + area.w, area.y + area.h)
-            # if the coordinate is relative, convert to absolute
-            if all(map(lambda z: z <= 1, (*left_top, *right_button))):
-                img_w, img_h = self.img.size
-                left_top = (floor(left_top[0] * img_w), floor(left_top[1] * img_h))
-                right_button = (floor(right_button[0] * img_w), floor(right_button[1] * img_h))
-            draw.rectangle((left_top, right_button), fill=255)
-            self.img = Image.composite(self.img, back, mask)
-            return self
-        raise ValueError('area must be type one of RectOprand')
+        return TesseractOperand(self, ocr_df)
 
     def to_data(self, with_content=True):
         w, h = self.img.size
@@ -162,7 +161,7 @@ class ScreenshotOperand(ImageOperand):
         return self.bound['left'], self.bound['top']
 
 
-class TesseractOcrOperand(Operand):
+class TesseractOperand(Operand):
 
     @staticmethod
     def get_level_num(name: str):
@@ -233,11 +232,22 @@ class PositionOperand(Operand):
         mouse_move(self.x, self.y, smooth)
 
 
-class CommonCmd:
+class BaseVm:
     is_quiet = False
+    parent: Optional['BaseVm'] = None
 
     def __init__(self):
         self._stack = []
+
+    def use_vm(self, name: str, *args, **kwargs):
+        vm = registered_vms.get(name)
+        if vm is None:
+            raise ValueError('vm {} is not existed.'.format(name))
+        vm.parent = self
+        return vm(*args, **kwargs)
+
+    def exit_vm(self):
+        return self.parent
 
     def to_data(self):
         if not self._stack:
@@ -344,34 +354,15 @@ class CommonCmd:
         if has_implement_protocol(op, 'scale'):
             return self._push(op.scale(*args, **kwargs))
 
-    def mask(self, *args, **kwargs):
-        op2 = self._pop()
-        op1 = self._pop()
-        if has_implement_protocol(op1, 'mask'):
-            return self._push(op1.mask(op2, *args, **kwargs))
-
     def ocr(self, *args, **kwargs):
         op = self._pop()
         if has_implement_protocol(op, 'ocr'):
-            return self._push(op.ocr(*args, **kwargs))
+            return self._push(op.tesseract(*args, **kwargs))
 
     def find(self, *args, **kwargs):
         op = self._pop()
         if has_implement_protocol(op, 'find'):
             return self._push(op.find(*args, **kwargs))
-
-
-def send_video_to_virtual_camera(timeout = 10):
-    with pyvirtualcam.Camera(width=1280, height=720, fps=20) as cam:
-        print(f'Using virtual camera: {cam.device}')
-        frame = np.zeros((cam.height, cam.width, 3), np.uint8)  # RGB
-        due = time.time() + timeout
-
-        while time.time() < due:
-            frame[:] = cam.frames_sent % 255  # grayscale animation
-            cam.send(frame)
-            cam.sleep_until_next_frame()
-
 
 def has_implement_protocol(obj, proto: str):
     return hasattr(obj, proto) and callable(getattr(obj, proto))

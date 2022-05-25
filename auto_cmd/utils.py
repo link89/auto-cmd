@@ -1,8 +1,8 @@
 import traceback
-from typing import List
 from pynput.mouse import Button, Controller as MouseController
 from pynput.keyboard import Key, Controller as KeyboardController
 import time
+
 
 _mouse = MouseController()
 _keyboard = KeyboardController()
@@ -49,16 +49,6 @@ def tap_key(key: str):
     _keyboard.tap(key)
 
 
-def send_keys(keys: List[str]):
-    pairs = dict()
-    for key in keys:
-        if key.startswith('^'):
-            key = key[1:]
-
-
-
-    pass
-
-
 def get_stacktrace_from_exception(e: Exception):
     return "".join(traceback.TracebackException.from_exception(e).format())
+

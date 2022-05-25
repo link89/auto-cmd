@@ -46,7 +46,7 @@ Run the following command to test if everything is OK.
 It may take several seconds to finish, don't touch your mouse and keyboard before it finish.
 
 ```shell
-auto-cmd open_browser https://github.com/link89/auto-cmd - sleep 5 - take_screenshot - grayscale - bi_level 0 128 - ocr - find star - move_to - click
+auto-cmd open_browser https://github.com/link89/auto-cmd - sleep 5 - take_screenshot - grayscale - bi_level 0 128 - tesseract - find star - move_to - click
 ```
 To test the remote execution via HTTP, you should start the HTTP server first
 ```shell
@@ -62,7 +62,7 @@ Now in your browser you can access the Swagger document via http://localhost:500
 Click Try it out and copy arguments of the previous command to the request body, like below.
 ```json
 {
-  "args": "open_browser https://github.com/link89/auto-cmd - sleep 5 - take_screenshot - grayscale - bi_level 0 128 - ocr - find star - move_to - click"
+  "args": "open_browser https://github.com/link89/auto-cmd - sleep 5 - take_screenshot - grayscale - bi_level 0 128 - tesseract - find star - move_to - click"
 }
 ```
 Then click Execute, you will find the command start to execute on the remote machine.

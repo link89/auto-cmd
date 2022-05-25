@@ -1,5 +1,5 @@
-from .core import CommonCmd
+from .core import BaseVm
 
 
-class WinAutoCmd(CommonCmd):
+class WinAutoVm(BaseVm):
     pass
