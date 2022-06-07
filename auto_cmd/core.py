@@ -6,7 +6,6 @@ import pytesseract
 from pytesseract import Output
 import base64
 from io import BytesIO
-import pyvirtualcam
 import numpy as np
 import pandas as pd
 import webbrowser
@@ -360,17 +359,6 @@ class CommonCmd:
         if has_implement_protocol(op, 'find'):
             return self._push(op.find(*args, **kwargs))
 
-
-def send_video_to_virtual_camera(timeout = 10):
-    with pyvirtualcam.Camera(width=1280, height=720, fps=20) as cam:
-        print(f'Using virtual camera: {cam.device}')
-        frame = np.zeros((cam.height, cam.width, 3), np.uint8)  # RGB
-        due = time.time() + timeout
-
-        while time.time() < due:
-            frame[:] = cam.frames_sent % 255  # grayscale animation
-            cam.send(frame)
-            cam.sleep_until_next_frame()
 
 
 def has_implement_protocol(obj, proto: str):

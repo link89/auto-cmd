@@ -13,7 +13,6 @@ install_requirements = [
     'uvicorn',
     'pytesseract',
     'Pillow',
-    'pyvirtualcam',
     'numpy',
     'mss',
     'pandas',
