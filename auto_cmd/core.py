@@ -236,24 +236,7 @@ class CommonCmd:
     is_quiet = False
 
     def __init__(self):
-        self._stack = []
-
-    def to_data(self):
-        if not self._stack:
-            return None
-        ret = self._peek()
-        if ret is None:
-            return None
-        if any(map(lambda cls: isinstance(ret, cls), [int, float, str])):
-            return ret
-        if has_implement_protocol(ret, 'to_data'):
-            return ret.to_data()
-        return str(ret)
-
-    def __str__(self):
-        if self.is_quiet:
-            return str(self._peek())
-        return json.dumps(self.to_data(), default=lambda o: str(type(o)))
+        pass
 
     def _push(self, op):
         self._stack.append(op)
@@ -360,7 +343,55 @@ class CommonCmd:
             return self._push(op.find(*args, **kwargs))
 
 
-
 def has_implement_protocol(obj, proto: str):
     return hasattr(obj, proto) and callable(getattr(obj, proto))
 
+
+IS_OPERATOR = 'is_operator'
+
+
+def define_operator(func):
+    setattr(func, IS_OPERATOR, True)
+    return func
+
+
+def is_operator(func):
+    return getattr(func, IS_OPERATOR, False)
+
+
+def get_operator(o, key):
+    operator = getattr(o, key, None)
+    return operator if is_operator(operator) else None
+
+
+def get_operator_names(o):
+    for key in o.__dict__.keys():
+        if get_operator(o, key) is not None:
+            yield key
+
+
+# the delegation pattern is inspired by: https://www.fast.ai/2019/08/06/delegation/
+class VirtualMachine:
+
+    def __init__(self):
+        self._permanent_operands = list()
+        self._ephemeral_operand = None
+
+    @property
+    def _operands(self):
+        yield from self._permanent_operands
+        if self._ephemeral_operand is not None:
+            yield self._ephemeral_operand
+
+    def __dir__(self):
+        attributes = set()
+        attributes.update(dir(type(self)))
+        attributes.update(self.__dict__.keys())
+
+        for operand in self._operands:
+            attributes.update(get_operator_names(operand))
+        return list(attributes)
+
+    def __getattr__(self, key):
+        for operand in self._operands:
+            pass
