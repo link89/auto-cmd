@@ -1,5 +1,5 @@
-from .core import CommonCmd
+from .core import DefaultVirtualMachine
 
 
-class WinAutoCmd(CommonCmd):
+class WinVirtualMachine(DefaultVirtualMachine):
     pass

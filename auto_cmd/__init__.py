@@ -7,8 +7,8 @@ def _get_cmd_class():
         from .mac import MacAutoCmd
         return MacAutoCmd
     if sys.platform == 'win32':
-        from .win import WinAutoCmd
-        return WinAutoCmd
+        from .win import WinVirtualMachine
+        return WinVirtualMachine
 
 AutoCmd = _get_cmd_class()
 
