@@ -6,14 +6,13 @@ import pytesseract
 from pytesseract import Output
 import base64
 from io import BytesIO
-import numpy as np
 import pandas as pd
 import webbrowser
-import json
 import sys
 import re
 from math import floor
 import mss
+from functools import wraps
 
 from .utils import get_stacktrace_from_exception, mouse_click, mouse_move
 
@@ -140,25 +139,9 @@ class ImageOperand(Operand):
 
 class ScreenshotOperand(ImageOperand):
 
-    bound = None  # dict with keys: left, top, width, height
-
-    @classmethod
-    def take_screenshot(cls, n=1):
-        with mss.mss() as sct:
-            monitor = sct.monitors[n]
-            screenshot = sct.grab(monitor)
-            img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
-            screenshot = cls(img)
-            screenshot.bound = monitor
-            return screenshot
-
-    @property
-    def scale_ratio(self):
-        return self.bound['width'] / self.img.size[0]
-
-    @property
-    def offset(self):
-        return self.bound['left'], self.bound['top']
+    def __init__(self, img: Image, monitor):
+        super().__init__(img)
+        self.monitor = monitor
 
 
 class TesseractOcrOperand(Operand):
@@ -321,11 +304,6 @@ class CommonCmd:
         if has_implement_protocol(op, 'bi_level'):
             return self._push(op.bi_level(*args, **kwargs))
 
-    def scale(self, *args, **kwargs):
-        op = self._pop()
-        if has_implement_protocol(op, 'scale'):
-            return self._push(op.scale(*args, **kwargs))
-
     def mask(self, *args, **kwargs):
         op2 = self._pop()
         op1 = self._pop()
@@ -379,9 +357,9 @@ class VirtualMachine:
 
     @property
     def _operands(self):
-        yield from self._permanent_operands
         if self._ephemeral_operand is not None:
             yield self._ephemeral_operand
+        yield from self._permanent_operands
 
     def __dir__(self):
         attributes = set()
@@ -394,4 +372,33 @@ class VirtualMachine:
 
     def __getattr__(self, key):
         for operand in self._operands:
-            pass
+            operator = get_operator(operand, key)
+            if operator is not None:
+                @wraps(operator)
+                def wrapper(*args, **kwargs):
+                    ret = operator(*args, **kwargs)
+                    if ret is not None:
+                        self._ephemeral_operand = ret
+                    return self
+                return wrapper
+        else:
+            raise AttributeError(key)
+
+
+class DefaultOperand(Operand):
+
+    @define_operator
+    def take_screenshot(self, n=1):
+        with mss.mss() as sct:
+            monitor = sct.monitors[n]
+            screenshot = sct.grab(monitor)
+            img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
+            return ScreenshotOperand(img, monitor)
+
+
+
+class DefaultVirtualMachine(VirtualMachine):
+
+    def __init__(self):
+        super().__init__()
+        self._permanent_operands.insert(0, DefaultOperand())
